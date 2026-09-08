@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════════════════════════════
+   §36 — the evidence room.
+
+   Near-black ground, off-white type, gold used as a scarce signal rather
+   than decoration: it marks the protocol's own verdicts and nothing
+   else. No gradients, no glass, no glow. The reference is a case file
+   under a desk lamp — paper, rules, and stamped findings.
+   ══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* The three prescribed values, plus the tones needed to build a
+     readable interface between them. */
+  --color-ink: #080808;          /* page */
+  --color-ink-raised: #101010;   /* cards, the "paper" */
+  --color-ink-sunken: #0b0b0b;   /* wells, code, insets */
+  --color-rule: #201f1c;         /* hairlines */
+  --color-rule-strong: #2e2c27;
+  --color-paper: #f5f5f2;        /* primary text */
+  --color-paper-muted: #a4a19a;  /* secondary text */
+  --color-paper-faint: #6f6c66;  /* labels, timestamps */
+  --color-gold: #d4af37;         /* the protocol's own voice */
+  --color-gold-dim: #8a7326;
+
+  /* Verdict colours stay muted; the verdict word carries the weight. */
+  --color-verdict-supported: #7fae7a;
+  --color-verdict-partial: #d4af37;
+  --color-verdict-contradicted: #c2695e;
+  --color-verdict-inconclusive: #8d8a83;
+  --color-verdict-outdated: #8a7fae;
+
+  --font-sans: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-serif: Newsreader, Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--color-ink);
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* §59 — the interface must never look more certain than the protocol
+     is. Nothing here animates into a finished state on its own. */
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-ink);
+  }
+
+  /* Visible focus everywhere: this is an interface for reading records
+     and filing evidence, and it has to be keyboard-navigable. */
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* A label in this interface is a field name on a form in a file. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-paper-faint);
+  }
+
+  .rule {
+    border-color: var(--color-rule);
+  }
+
+  .card {
+    background: var(--color-ink-raised);
+    border: 1px solid var(--color-rule);
+  }
+
+  /* The stamped finding. Used only where the protocol has actually
+     ruled — never as decoration on a pending state. */
+  .stamp {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    padding: 0.25rem 0.6rem;
+  }
+}
+
+/* React Flow renders on our ground, not its own. The attribution stays:
+   hiding it is only permitted for Pro subscribers, so it is toned to the
+   palette rather than removed. */
+.react-flow__attribution {
+  background: transparent;
+}
+.react-flow__attribution a {
+  color: var(--color-paper-faint);
+  font-size: 9px;
+}

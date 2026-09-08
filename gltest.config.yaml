@@ -1,0 +1,19 @@
+# Mirrors the official GenLayer boilerplate's layout.
+#
+# The direct suite runs with zero setup: `pytest tests/direct/` needs no
+# network and no keys. Live accounts are NOT listed here — gltest
+# interpolates `${VAR}` eagerly, so a placeholder for a network you have
+# not configured breaks the offline suite for everyone. See
+# docs/deployment.md for the studionet accounts block.
+networks:
+  default: localnet
+
+  localnet:
+    url: "http://127.0.0.1:4000/api"
+
+  studionet: {}
+
+paths:
+  contracts: "contracts"
+
+environment: .env
