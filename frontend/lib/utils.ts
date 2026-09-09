@@ -5,6 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * A consensus-observed UTC second, rendered as a date.
+ *
+ * These are real timestamps now: the contract reads them from a public
+ * clock through a validator round. Before the steward fix the only
+ * "time" available was a caller-advanced counter, which is why the UI
+ * used to render durations instead — printing that as a date would have
+ * been inventing information the protocol did not have.
+ */
+export function utcTime(seconds: number): string {
+  const value = Number(seconds || 0);
+  if (value <= 0) return "—";
+  return new Date(value * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+}
+
+/** A per-claim sequence number. Ordering, never a clock. */
+export function seq(value: number): string {
+  return `#${Number(value || 0)}`;
+}
+
 /** Protocol seconds, rendered as a duration rather than a fake wall clock.
  *
  * The contract's clock counts seconds advanced by transactions, not

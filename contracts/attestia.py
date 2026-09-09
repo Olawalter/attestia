@@ -117,12 +117,34 @@ C_REJECTED = "REJECTED"
 C_SUPERSEDED = "SUPERSEDED"
 VALID_CHALLENGE_STATUS = {C_OPEN, C_ACCEPTED, C_REJECTED, C_SUPERSEDED}
 
-# ─── §12 protocol timing ──────────────────────────────────────────────────
+# ─── protocol timing ──────────────────────────────────────────────────────
+#
+# STEWARD FIX (time trust). Deadlines used to be measured against a single
+# global counter that ANY account could advance, so one caller could expire
+# every other claim in the contract. They are now measured in real UTC
+# seconds against a timestamp OBSERVED THROUGH CONSENSUS: the leader reads
+# a public time source, every validator reads it independently, and the
+# round only lands if they agree within CLOCK_TOLERANCE. A caller can ask
+# the network what time it is; it cannot tell the network what time it is.
+CLOCK_URL = "https://cloudflare.com/cdn-cgi/trace"
+
+# Sanity bounds. A time source that answers outside this range is broken or
+# hostile, and either way the protocol refuses to date a case by it.
+CLOCK_FLOOR = 1_767_225_600          # 2026-01-01T00:00:00Z
+CLOCK_CEIL = 4_102_444_800           # 2100-01-01T00:00:00Z
+
+# Validators never see the same instant. Agreement is "within five
+# minutes", which is far tighter than any window this protocol measures
+# and far looser than the spread between honest nodes.
+CLOCK_TOLERANCE = 300
+
 # Attestia's own constants, in seconds. Not copied from another project.
 DEFAULT_EVIDENCE_WINDOW = 7 * 24 * 60 * 60      # 7 days to gather evidence
 MIN_EVIDENCE_WINDOW = 60                        # a demo can move fast
 MAX_EVIDENCE_WINDOW = 90 * 24 * 60 * 60
-CHALLENGE_WINDOW = 3 * 24 * 60 * 60             # 3 days to contest a verdict
+DEFAULT_CHALLENGE_WINDOW = 3 * 24 * 60 * 60     # 3 days to contest a verdict
+MIN_CHALLENGE_WINDOW = 60                       # a demo can move fast
+MAX_CHALLENGE_WINDOW = 30 * 24 * 60 * 60
 
 # ─── §43 bounds ───────────────────────────────────────────────────────────
 MAX_CLAIM_TEXT = 1000
@@ -157,10 +179,19 @@ class Claim:
     creator: Address
     status: str
     current_version: u256
-    created_at: u256
-    updated_at: u256
+    # Ordering, not time. A sequence number cannot be mistaken for a
+    # timestamp and cannot be moved by anyone.
+    created_seq: u256
+    updated_seq: u256
+    # Real UTC seconds, every one of them observed through consensus and 0
+    # until the protocol has actually reached that point.
+    evidence_window_seconds: u256
+    # Fixed at creation and frozen there. The creator chooses how long the
+    # verdict may be contested BEFORE anyone knows what it will be, and no
+    # one — creator included — can shorten it afterwards.
+    challenge_window_seconds: u256
+    opened_at: u256
     evidence_deadline: u256
-    adjudication_started_at: u256
     adjudicated_at: u256
     challenge_deadline: u256
     finalized_at: u256
@@ -182,7 +213,7 @@ class Evidence:
     source_url: str
     source_type: str
     description: str
-    submitted_at: u256
+    submitted_seq: u256          # per-claim ordering, not a timestamp
     claim_version: u256
     status: str
     # What the SUBMITTER asserted. Never authoritative (§15).
@@ -191,6 +222,11 @@ class Evidence:
     adjudicated_relationship: str
     adjudicated_in: str           # adjudication_id that classified it
     retrieval: str                # §45 outcome observed during adjudication
+    # STEWARD FIX (evidence trust). sha256 of the CANONICAL TEXT the panel
+    # actually read at adjudication — not of the URL, and not of what the
+    # submitter said about it. Empty until a panel has read the source,
+    # and empty forever if it could not be read.
+    content_digest: str
 
 
 @allow_storage
@@ -211,6 +247,15 @@ class Adjudication:
     unavailable_json: str
     evidence_snapshot_json: str   # exactly what was frozen for this round
     evidence_snapshot_hash: str
+    # STEWARD FIX (evidence trust). The record hash above covers what was
+    # SUBMITTED — ids, urls, descriptions. It says nothing about what the
+    # panel read, so on its own it lets a verdict outlive the content that
+    # produced it. These two cover the content itself: a canonical map of
+    # evidence_id -> content digest, and one hash over that map. The
+    # digests are part of the consensus fingerprint, so validators must
+    # have read the same bytes for the round to land at all.
+    content_binding_json: str
+    content_binding_hash: str
     adjudicated_at: u256
     round_number: u256
 
@@ -224,7 +269,7 @@ class Challenge:
     submitted_by: Address
     reason: str
     counter_evidence_json: str
-    submitted_at: u256
+    submitted_seq: u256
     status: str
     resulting_version: u256       # 0 until the challenge opens a version
 
@@ -240,10 +285,11 @@ class Attestation:
     evidence_count: u256
     challenge_count: u256
     claim_text: str
-    created_at: u256
+    claim_created_seq: u256
     adjudicated_at: u256
     finalized_at: u256
     evidence_snapshot_hash: str
+    content_binding_hash: str
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -276,6 +322,31 @@ def _load_list(raw: str) -> list:
 def _sha256_hex(data: bytes) -> str:
     import hashlib
     return hashlib.sha256(data).hexdigest()
+
+
+def _parse_trace_ts(body: str) -> int:
+    """Pull the epoch seconds out of a Cloudflare trace response.
+
+    The document is a flat `key=value` list containing `ts=1767225600.123`.
+    Parsing is deliberately strict: a body that does not carry a sane `ts`
+    is not a clock, and the caller fails closed rather than dating a case
+    by a number it did not understand.
+    """
+    for line in str(body or "").splitlines():
+        line = line.strip()
+        if not line.startswith("ts="):
+            continue
+        try:
+            value = int(float(line[3:]))
+        except Exception:
+            raise gl.vm.UserError(f"{ERR_EXTERNAL} time source returned an "
+                                  f"unparseable timestamp")
+        if value < CLOCK_FLOOR or value > CLOCK_CEIL:
+            raise gl.vm.UserError(
+                f"{ERR_EXTERNAL} time source returned {value}, outside the "
+                f"sane range [{CLOCK_FLOOR}, {CLOCK_CEIL}]")
+        return value
+    raise gl.vm.UserError(f"{ERR_EXTERNAL} time source carried no `ts` field")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -537,6 +608,9 @@ def _normalize_result(obj, expected_claim_id: str, expected_version: int,
             "claim_version": version,
             "verdict": verdict,
             "reason": reason,
+            # Filled in by the contract from its own retrieval, never by
+            # the model. Declared here so the key set stays fixed.
+            "content_bindings": [],
         }
         result.update(buckets)
         return result
@@ -544,6 +618,28 @@ def _normalize_result(obj, expected_claim_id: str, expected_version: int,
         raise
     except Exception as exc:
         raise gl.vm.UserError(f"{ERR_LLM} malformed result: {exc}")
+
+
+def _content_bindings(retrieved: list) -> list:
+    """evidence_id -> (retrieval outcome, digest of what was read).
+
+    Sorted by id and built only from this node's own retrieval, so it is a
+    deterministic statement of "here is the evidence I actually saw". It
+    goes into the consensus fingerprint, which is what stops a verdict
+    being detached from the content that produced it: two nodes that read
+    different bytes cannot agree, and a source that changes after the fact
+    no longer matches the binding the verdict was recorded against.
+    """
+    rows = []
+    for item in retrieved:
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "evidence_id": str(item.get("evidence_id", "")),
+            "retrieval": str(item.get("retrieval", "")),
+            "digest": str(item.get("digest", "")),
+        })
+    return sorted(rows, key=lambda r: r["evidence_id"])
 
 
 def _decision_fingerprint(norm: dict) -> str:
@@ -566,6 +662,12 @@ def _decision_fingerprint(norm: dict) -> str:
     for field, _relationship in BUCKETS:
         projection[field] = norm[field]
     projection["unavailable_evidence"] = norm["unavailable_evidence"]
+    # STEWARD FIX (evidence trust). Without this line a validator agreed
+    # only about the CONCLUSION, so a leader could reach the right-looking
+    # verdict over the wrong document and nobody would notice. With it,
+    # agreement means the panel read the same bytes AND drew the same
+    # conclusions from them.
+    projection["content_bindings"] = norm.get("content_bindings", [])
     return _sha256_hex(_canon(projection).encode("utf-8"))
 
 
@@ -623,8 +725,6 @@ class Attestia(gl.Contract):
     challenge_seq: u256
     attestation_seq: u256
 
-    # §12 — the protocol clock. See _now().
-    protocol_clock: u256
 
     def __init__(self):
         self.version = VERSION
@@ -634,39 +734,98 @@ class Attestia(gl.Contract):
         self.adjudication_seq = u256(0)
         self.challenge_seq = u256(0)
         self.attestation_seq = u256(0)
-        self.protocol_clock = u256(0)
 
     # ══════════════════════════════════════════════════════════════════════
-    #  §12 — protocol time
+    #  protocol time — observed, not chosen
     # ══════════════════════════════════════════════════════════════════════
     #
-    # §12 asks for UTC Unix seconds from "the current GenLayer-supported
-    # deterministic timestamp mechanism". On the pinned runner there is
-    # none: `gl.vm.get_timestamp()` is documented for v0.3.0 but is absent
-    # from the std lib this runner bundles, and `gl.message` carries only
-    # contract_address, sender_address, origin_address, value and
-    # chain_id — no datetime. Both were checked against the extracted
-    # runner rather than assumed.
+    # STEWARD FIX (time trust).
     #
-    # The three remaining options are: wall-clock inside deterministic
-    # code (not available, and non-deterministic across validators if it
-    # were), a caller-supplied timestamp (§12 forbids treating client time
-    # as authoritative), or a protocol clock the chain itself advances.
-    # Attestia takes the third.
+    # This contract used to keep a single `protocol_clock` counter and let
+    # ANY account push it forward through a public `advance_clock`. That
+    # was a trust boundary in the wrong place, in two ways at once:
     #
-    # The clock is measured in SECONDS so every deadline in this contract
-    # is expressed in the unit §12 asks for, and it advances only when a
-    # transaction moves the protocol forward — which is exactly §12's
-    # other requirement, that a deadline passing is not itself a state
-    # transition. `advance_clock` is public and unprivileged so no party
-    # can hold the protocol still.
-    def _now(self) -> int:
-        return int(self.protocol_clock)
+    #   * directly — Bob could advance the clock past Alice's evidence or
+    #     challenge deadline and expire a case he had nothing to do with;
+    #   * incidentally — every write ticked the same counter, so ordinary
+    #     activity on one claim aged every other claim in the contract.
+    #
+    # Both are gone. There is no global clock and no way to set one. The
+    # runner offers no authoritative timestamp (`gl.vm.get_timestamp` is
+    # documented for v0.3.0 but absent from the std lib this runner
+    # bundles, and `gl.message` carries no datetime — both checked against
+    # the extracted runner, not assumed), so time is obtained the way this
+    # protocol obtains every other contested fact: by consensus.
+    #
+    # The leader reads a public clock, EVERY VALIDATOR READS IT
+    # INDEPENDENTLY, and the round only lands if the readings agree within
+    # CLOCK_TOLERANCE. A caller can ask the network what time it is. No
+    # caller can tell the network what time it is.
+    def _observe_time(self) -> int:
+        url = CLOCK_URL
+        tolerance = CLOCK_TOLERANCE
+        parse = _parse_trace_ts
 
-    def _tick(self, seconds: int) -> int:
-        step = max(0, int(seconds))
-        self.protocol_clock = u256(int(self.protocol_clock) + step)
-        return int(self.protocol_clock)
+        # The fetch is duplicated across the two closures on purpose:
+        # genvm-lint requires every `gl.nondet.*` call to sit directly
+        # inside a closure passed to run_nondet_unsafe, and behind another
+        # call frame it reports the call as unreachable from the
+        # equivalence block. The copies must stay identical.
+        def leader_fn():
+            resp = gl.nondet.web.get(url)
+            status = int(getattr(resp, "status", 0) or 0)
+            if status and not (200 <= status < 300):
+                raise gl.vm.UserError(
+                    f"{ERR_TRANSIENT} time source returned {status}")
+            body = getattr(resp, "body", None)
+            if body is None:
+                body = getattr(resp, "text", "")
+            if isinstance(body, (bytes, bytearray)):
+                body = body.decode("utf-8", "ignore")
+            return {"ts": parse(str(body))}
+
+        def validator_fn(leaders_res: gl.vm.Result) -> bool:
+            if not isinstance(leaders_res, gl.vm.Return):
+                return _handle_leader_error(leaders_res, leader_fn)
+            try:
+                resp = gl.nondet.web.get(url)
+                status = int(getattr(resp, "status", 0) or 0)
+                if status and not (200 <= status < 300):
+                    return False
+                body = getattr(resp, "body", None)
+                if body is None:
+                    body = getattr(resp, "text", "")
+                if isinstance(body, (bytes, bytearray)):
+                    body = body.decode("utf-8", "ignore")
+                mine = parse(str(body))
+                theirs = int(leaders_res.calldata.get("ts"))
+            except Exception:
+                return False
+            # Tolerance, not equality: two honest nodes never read the same
+            # instant, and demanding an exact match would fail every round
+            # for a reason unrelated to honesty. Five minutes is far
+            # tighter than any window this protocol measures.
+            return abs(theirs - mine) <= tolerance
+
+        out = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        try:
+            observed = int(out.get("ts")) if isinstance(out, dict) else 0
+        except Exception:
+            observed = 0
+        if observed < CLOCK_FLOOR or observed > CLOCK_CEIL:
+            raise gl.vm.UserError(
+                f"{ERR_EXTERNAL} consensus produced no usable timestamp")
+        return observed
+
+    def _touch(self, claim: Claim) -> int:
+        """Per-claim mutation counter.
+
+        Replaces the old `updated_at`, which was a global-clock reading and
+        therefore moved when other people's claims moved. A counter that
+        belongs to one claim cannot be advanced from outside it.
+        """
+        claim.updated_seq = u256(int(claim.updated_seq) + 1)
+        return int(claim.updated_seq)
 
     # ══════════════════════════════════════════════════════════════════════
     #  guards (§13, §43)
@@ -696,7 +855,8 @@ class Attestia(gl.Contract):
     # ══════════════════════════════════════════════════════════════════════
 
     @gl.public.write
-    def create_claim(self, claim_text: str, evidence_window_seconds: int = 0) -> str:
+    def create_claim(self, claim_text: str, evidence_window_seconds: int = 0,
+                     challenge_window_seconds: int = 0) -> str:
         """Create a claim in DRAFT. The caller becomes its creator.
 
         The claim id is minted from a contract-owned sequence: a frontend
@@ -716,20 +876,31 @@ class Attestia(gl.Contract):
                 f"evidence window must be between {MIN_EVIDENCE_WINDOW} and "
                 f"{MAX_EVIDENCE_WINDOW} seconds (got {window})")
 
+        contest = int(challenge_window_seconds or DEFAULT_CHALLENGE_WINDOW)
+        if contest < MIN_CHALLENGE_WINDOW or contest > MAX_CHALLENGE_WINDOW:
+            raise _expected(
+                f"challenge window must be between {MIN_CHALLENGE_WINDOW} and "
+                f"{MAX_CHALLENGE_WINDOW} seconds (got {contest})")
+
         self.claim_seq = u256(int(self.claim_seq) + 1)
         claim_id = self._mint_id("claim", self.claim_seq)
-        now = self._tick(1)
 
+        # Creation needs no clock. The window is recorded as a DURATION and
+        # only becomes a deadline when the claim is opened and a real
+        # timestamp is observed — so a claim can sit in draft indefinitely
+        # without anyone's deadline running.
         self.claims[claim_id] = Claim(
             claim_id=claim_id,
             claim_text=text,
             creator=gl.message.sender_address,
             status=S_DRAFT,
             current_version=u256(1),
-            created_at=u256(now),
-            updated_at=u256(now),
-            evidence_deadline=u256(now + window),
-            adjudication_started_at=u256(0),
+            created_seq=u256(int(self.claim_seq)),
+            updated_seq=u256(0),
+            evidence_window_seconds=u256(window),
+            challenge_window_seconds=u256(contest),
+            opened_at=u256(0),
+            evidence_deadline=u256(0),
             adjudicated_at=u256(0),
             challenge_deadline=u256(0),
             finalized_at=u256(0),
@@ -748,35 +919,27 @@ class Attestia(gl.Contract):
         return claim_id
 
     @gl.public.write
-    def open_claim(self, claim_id: str) -> None:
-        """DRAFT → OPEN. Evidence may now be submitted."""
+    def open_claim(self, claim_id: str) -> int:
+        """DRAFT → OPEN, and start the clock on this claim only.
+
+        This is where the one timestamp a claim needs gets anchored, and
+        it is observed through consensus rather than supplied by anyone.
+        Only the creator may open their own claim, so no other account can
+        start — or shorten — someone else's evidence window.
+
+        Returns the observed UTC second the window opened at.
+        """
         claim = self._require_claim(claim_id)
         self._require_creator(claim)
         self._require_state(claim, {S_DRAFT})
-        now = self._tick(1)
+
+        opened = self._observe_time()
         claim.status = S_OPEN
-        claim.updated_at = u256(now)
-        # The window is measured from the moment collection actually
-        # opens, not from creation — a claim can sit in draft.
+        claim.opened_at = u256(opened)
         claim.evidence_deadline = u256(
-            now + max(MIN_EVIDENCE_WINDOW,
-                      int(claim.evidence_deadline) - int(claim.created_at)))
-
-    @gl.public.write
-    def advance_clock(self, seconds: int) -> int:
-        """Move the protocol clock forward (§12).
-
-        Public and unprivileged on purpose: deadlines must be reachable by
-        anyone, or a party who stops transacting could freeze a case
-        forever. It cannot rewind, and it grants no other authority.
-        """
-        step = int(seconds)
-        if step <= 0:
-            raise _expected("clock may only move forward")
-        if step > MAX_EVIDENCE_WINDOW:
-            raise _expected(
-                f"clock step exceeds {MAX_EVIDENCE_WINDOW} seconds")
-        return self._tick(step)
+            opened + int(claim.evidence_window_seconds))
+        self._touch(claim)
+        return opened
 
     # ══════════════════════════════════════════════════════════════════════
     #  PHASE 2 — evidence (§15, §16)
@@ -819,12 +982,12 @@ class Attestia(gl.Contract):
         claim = self._require_claim(claim_id)
         self._require_state(claim, EVIDENCE_OPEN_STATES)
 
-        now = self._now()
-        if now > int(claim.evidence_deadline):
-            raise _expected(
-                f"evidence window closed at {int(claim.evidence_deadline)} "
-                f"(now {now}); close evidence to adjudicate")
-
+        # No clock read here on purpose. While the claim is OPEN the record
+        # accepts submissions; the window bounds how long it STAYS open,
+        # and that is enforced at close. Checking a deadline per submission
+        # would put a consensus round in front of every filing and buy
+        # nothing — a source filed a second before closing is as
+        # legitimate as one filed an hour earlier.
         url = _clip(source_url, MAX_URL)
         if not url:
             raise _expected("source_url is required")
@@ -859,6 +1022,7 @@ class Attestia(gl.Contract):
 
         self.evidence_seq = u256(int(self.evidence_seq) + 1)
         evidence_id = self._mint_id("ev", self.evidence_seq)
+        seq = self._touch(claim)
 
         self.evidence[evidence_id] = Evidence(
             evidence_id=evidence_id,
@@ -867,13 +1031,14 @@ class Attestia(gl.Contract):
             source_url=url,
             source_type=_clip(source_type, MAX_SOURCE_TYPE) or "UNSPECIFIED",
             description=desc,
-            submitted_at=u256(now),
+            submitted_seq=u256(seq),
             claim_version=u256(version),
             status=E_ACTIVE,
             declared_relationship=declared,
             adjudicated_relationship="",
             adjudicated_in="",
             retrieval="",
+            content_digest="",
         )
         ids = self._evidence_ids(claim_id)
         ids.append(evidence_id)
@@ -881,7 +1046,6 @@ class Attestia(gl.Contract):
 
         claim.evidence_count = u256(len(self._version_evidence(claim_id, version)))
         claim.total_evidence_count = u256(int(claim.total_evidence_count) + 1)
-        claim.updated_at = u256(self._tick(1))
         return evidence_id
 
     @gl.public.write
@@ -916,27 +1080,21 @@ class Attestia(gl.Contract):
         ev.status = E_REMOVED
         claim.evidence_count = u256(
             len(self._version_evidence(claim_id, int(claim.current_version))))
-        claim.updated_at = u256(self._tick(1))
+        self._touch(claim)
 
     @gl.public.write
     def close_evidence(self, claim_id: str) -> str:
         """OPEN → EVIDENCE_CLOSED. Freezes the set for this version (§19).
 
-        Either the creator closes collection deliberately, or anyone may
-        close it once the deadline has passed — otherwise a creator who
-        dislikes the incoming evidence could hold a case open forever.
+        The creator closes their own collection whenever they choose. Any
+        other account must go through `force_close_evidence`, which has to
+        prove the window elapsed against a consensus-observed clock — that
+        split is what stops one caller ending another's evidence window.
         The returned hash is what the adjudication is bound to.
         """
         claim = self._require_claim(claim_id)
+        self._require_creator(claim)
         self._require_state(claim, {S_OPEN})
-
-        now = self._now()
-        is_creator = (
-            str(gl.message.sender_address).lower() == str(claim.creator).lower())
-        if not is_creator and now <= int(claim.evidence_deadline):
-            raise _expected(
-                f"only the creator may close early; the window runs to "
-                f"{int(claim.evidence_deadline)} (now {now})")
 
         version = int(claim.current_version)
         frozen = self._version_evidence(claim_id, version)
@@ -947,7 +1105,40 @@ class Attestia(gl.Contract):
 
         claim.status = S_EVIDENCE_CLOSED
         claim.evidence_count = u256(len(frozen))
-        claim.updated_at = u256(self._tick(1))
+        self._touch(claim)
+        return _canon([ev.evidence_id for ev in frozen])
+
+    @gl.public.write
+    def force_close_evidence(self, claim_id: str) -> str:
+        """Close a stalled claim's evidence window — but only once it has
+        genuinely elapsed.
+
+        This is the liveness escape hatch the old design got wrong. A
+        creator who dislikes the incoming record should not be able to
+        hold a case open forever, so anyone may close it — and precisely
+        because anyone may call this, the deadline it checks has to be a
+        time nobody at the keyboard can choose. `_observe_time()` puts
+        that reading to the validator panel.
+        """
+        claim = self._require_claim(claim_id)
+        self._require_state(claim, {S_OPEN})
+
+        version = int(claim.current_version)
+        frozen = self._version_evidence(claim_id, version)
+        if not frozen:
+            raise _expected(
+                "cannot close an empty record — a claim with no evidence "
+                "has nothing to adjudicate")
+
+        observed = self._observe_time()
+        if observed < int(claim.evidence_deadline):
+            raise _expected(
+                f"evidence window runs to {int(claim.evidence_deadline)}; "
+                f"consensus reads {observed}")
+
+        claim.status = S_EVIDENCE_CLOSED
+        claim.evidence_count = u256(len(frozen))
+        self._touch(claim)
         return _canon([ev.evidence_id for ev in frozen])
 
     # ══════════════════════════════════════════════════════════════════════
@@ -979,8 +1170,7 @@ class Attestia(gl.Contract):
 
         claim.status = (S_RE_ADJUDICATING if claim.status == S_CHALLENGED
                         else S_ADJUDICATING)
-        claim.adjudication_started_at = u256(self._tick(1))
-        claim.updated_at = claim.adjudication_started_at
+        self._touch(claim)
         return claim.status
 
     @gl.public.write
@@ -1017,7 +1207,7 @@ class Attestia(gl.Contract):
                 "source_url": ev.source_url,
                 "source_type": ev.source_type,
                 "description": ev.description,
-                "submitted_at": int(ev.submitted_at),
+                "submitted_seq": int(ev.submitted_seq),
                 "declared_relationship": ev.declared_relationship,
             }
             for ev in frozen
@@ -1036,7 +1226,19 @@ class Attestia(gl.Contract):
         # ── the panel agreed; only now does protocol state move ──
         self.adjudication_seq = u256(int(self.adjudication_seq) + 1)
         adjudication_id = self._mint_id("adj", self.adjudication_seq)
-        now = self._tick(1)
+
+        bindings = norm.get("content_bindings") or []
+        binding_json = _canon(bindings)
+        binding_hash = _sha256_hex(binding_json.encode("utf-8"))
+        digest_by_id = {
+            str(row.get("evidence_id", "")): str(row.get("digest", ""))
+            for row in bindings if isinstance(row, dict)
+        }
+
+        # The verdict is dated by the same consensus clock as every other
+        # deadline in this contract, so the challenge window it opens rests
+        # on a time no caller chose.
+        now = self._observe_time()
 
         self.adjudications[adjudication_id] = Adjudication(
             adjudication_id=adjudication_id,
@@ -1052,6 +1254,8 @@ class Attestia(gl.Contract):
             unavailable_json=_canon(norm["unavailable_evidence"]),
             evidence_snapshot_json=snapshot,
             evidence_snapshot_hash=snapshot_hash,
+            content_binding_json=binding_json,
+            content_binding_hash=binding_hash,
             adjudicated_at=u256(now),
             round_number=u256(round_number),
         )
@@ -1066,6 +1270,7 @@ class Attestia(gl.Contract):
                 ev.adjudicated_relationship = relationship
                 ev.adjudicated_in = adjudication_id
                 ev.retrieval = F_OK
+                ev.content_digest = digest_by_id.get(eid, "")
         for eid in norm["unavailable_evidence"]:
             ev = self.evidence[eid]
             # No relationship: an unread source has not been shown to
@@ -1073,14 +1278,17 @@ class Attestia(gl.Contract):
             ev.adjudicated_relationship = ""
             ev.adjudicated_in = adjudication_id
             ev.retrieval = F_UNAVAILABLE
+            # Fails closed: nothing was read, so nothing is bound.
+            ev.content_digest = ""
 
         claim.status = S_ADJUDICATED
         claim.current_verdict = norm["verdict"]
         claim.current_adjudication_id = adjudication_id
         claim.adjudication_count = u256(round_number)
         claim.adjudicated_at = u256(now)
-        claim.challenge_deadline = u256(now + CHALLENGE_WINDOW)
-        claim.updated_at = u256(now)
+        claim.challenge_deadline = u256(
+            now + int(claim.challenge_window_seconds))
+        self._touch(claim)
         return adjudication_id
 
     def _run_panel(self, claim_text: str, claim_id: str, version: int,
@@ -1106,6 +1314,8 @@ class Attestia(gl.Contract):
         classify = _classify_fetch
         normalize_text = _normalize_source_text
         build_prompt = _build_prompt
+        digest = _sha256_hex
+        bind = _content_bindings
 
         # NOTE — the retrieval loop is duplicated in the two closures
         # rather than shared. genvm-lint requires every `gl.nondet.*` call
@@ -1132,18 +1342,30 @@ class Attestia(gl.Contract):
                     outcome, body = classify(resp)
                 except Exception:
                     outcome, body = F_UNAVAILABLE, ""
+                canonical = normalize_text(body) if outcome == F_OK else ""
                 retrieved.append({
                     "evidence_id": entry.get("evidence_id", ""),
                     "url": url,
                     "retrieval": outcome,
-                    "content": normalize_text(body) if outcome == F_OK else "",
+                    "content": canonical,
+                    # STEWARD FIX (evidence trust): the digest is taken over
+                    # the CANONICAL text — the same normalisation every node
+                    # applies — so two validators reading the same document
+                    # agree despite markup and whitespace differences, while
+                    # a document that genuinely changed does not.
+                    "digest": digest(canonical.encode("utf-8")) if canonical else "",
                 })
             raw = gl.nondet.exec_prompt(
                 build_prompt(text, ver, cid, view, retrieved),
                 response_format="json")
             if not isinstance(raw, dict):
                 raise gl.vm.UserError(f"{ERR_LLM} panel returned a non-object")
-            return {"normalized": normalize(raw, cid, ver, ids)}
+            norm = normalize(raw, cid, ver, ids)
+            # The binding is derived from what THIS node retrieved, never
+            # from anything the model said. A model cannot talk its way
+            # into a different digest.
+            norm["content_bindings"] = bind(retrieved)
+            return {"normalized": norm}
 
         def validator_fn(leaders_res: gl.vm.Result) -> bool:
             if not isinstance(leaders_res, gl.vm.Return):
@@ -1165,11 +1387,13 @@ class Attestia(gl.Contract):
                         outcome, body = classify(resp)
                     except Exception:
                         outcome, body = F_UNAVAILABLE, ""
+                    canonical = normalize_text(body) if outcome == F_OK else ""
                     retrieved.append({
                         "evidence_id": entry.get("evidence_id", ""),
                         "url": url,
                         "retrieval": outcome,
-                        "content": normalize_text(body) if outcome == F_OK else "",
+                        "content": canonical,
+                        "digest": digest(canonical.encode("utf-8")) if canonical else "",
                     })
                 raw = gl.nondet.exec_prompt(
                     build_prompt(text, ver, cid, view, retrieved),
@@ -1177,6 +1401,7 @@ class Attestia(gl.Contract):
                 if not isinstance(raw, dict):
                     return False
                 mine = normalize(raw, cid, ver, ids)
+                mine["content_bindings"] = bind(retrieved)
             except gl.vm.UserError:
                 return False
             except Exception:
@@ -1225,12 +1450,12 @@ class Attestia(gl.Contract):
         claim = self._require_claim(claim_id)
         self._require_state(claim, {S_ADJUDICATED})
 
-        now = self._now()
-        if now > int(claim.challenge_deadline):
-            raise _expected(
-                f"challenge window closed at {int(claim.challenge_deadline)} "
-                f"(now {now})")
-
+        # No clock read here. A challenge is admissible for as long as the
+        # claim has not finalized, and finalization itself cannot happen
+        # until consensus confirms the window elapsed — so the window is
+        # enforced once, at the point where it actually matters, and a
+        # challenger can never be shut out early by someone else's
+        # transaction.
         text = _clip(reason, MAX_REASON)
         if not text:
             raise _expected("a challenge must state its reason")
@@ -1261,6 +1486,7 @@ class Attestia(gl.Contract):
 
         self.challenge_seq = u256(int(self.challenge_seq) + 1)
         challenge_id = self._mint_id("chal", self.challenge_seq)
+        seq = self._touch(claim)
 
         ids = self._evidence_ids(claim.claim_id)
         new_ids = []
@@ -1276,13 +1502,14 @@ class Attestia(gl.Contract):
                 source_url=ev.source_url,
                 source_type=ev.source_type,
                 description=ev.description,
-                submitted_at=u256(now),
+                submitted_seq=u256(seq),
                 claim_version=u256(new_version),
                 status=E_ACTIVE,
                 declared_relationship=ev.declared_relationship,
                 adjudicated_relationship="",   # the new round decides afresh
                 adjudicated_in="",
                 retrieval="",
+                content_digest="",
             )
             ids.append(copy_id)
             new_ids.append(copy_id)
@@ -1315,13 +1542,14 @@ class Attestia(gl.Contract):
                 source_type=_clip(entry.get("source_type", ""),
                                   MAX_SOURCE_TYPE) or "UNSPECIFIED",
                 description=desc,
-                submitted_at=u256(now),
+                submitted_seq=u256(seq),
                 claim_version=u256(new_version),
                 status=E_ACTIVE,
                 declared_relationship=R_UNCLASSIFIED,
                 adjudicated_relationship="",
                 adjudicated_in="",
                 retrieval="",
+                content_digest="",
             )
             ids.append(counter_id)
             new_ids.append(counter_id)
@@ -1336,7 +1564,7 @@ class Attestia(gl.Contract):
             submitted_by=gl.message.sender_address,
             reason=text,
             counter_evidence_json=_canon(counter_ids),
-            submitted_at=u256(now),
+            submitted_seq=u256(seq),
             status=C_ACCEPTED,
             resulting_version=u256(new_version),
         )
@@ -1362,7 +1590,7 @@ class Attestia(gl.Contract):
         claim.current_verdict = V_NONE
         claim.current_adjudication_id = ""
         claim.status = S_CHALLENGED
-        claim.updated_at = u256(self._tick(1))
+        self._touch(claim)
         return challenge_id
 
     # ══════════════════════════════════════════════════════════════════════
@@ -1373,18 +1601,20 @@ class Attestia(gl.Contract):
     def finalize_claim(self, claim_id: str) -> str:
         """ADJUDICATED → FINALIZED, and mint the attestation (§28).
 
-        Deterministic and permissionless. Every condition is checked
-        against protocol state rather than assumed, and the deadline
-        passing is not itself the transition — this transaction is (§12).
+        Permissionless, and every condition is checked against protocol
+        state rather than assumed. The challenge deadline is confirmed
+        against a CONSENSUS-OBSERVED clock: finalizing is the one action
+        that can end someone else's right to challenge, so the time it
+        turns on must be a time the caller cannot choose.
         """
         claim = self._require_claim(claim_id)
         self._require_state(claim, {S_ADJUDICATED})
 
-        now = self._now()
-        if now <= int(claim.challenge_deadline):
+        observed = self._observe_time()
+        if observed < int(claim.challenge_deadline):
             raise _expected(
                 f"challenge window is open until "
-                f"{int(claim.challenge_deadline)} (now {now})")
+                f"{int(claim.challenge_deadline)}; consensus reads {observed}")
 
         adjudication_id = claim.current_adjudication_id
         if not adjudication_id or adjudication_id not in self.adjudications:
@@ -1413,16 +1643,17 @@ class Attestia(gl.Contract):
             evidence_count=u256(int(claim.evidence_count)),
             challenge_count=u256(int(claim.challenge_count)),
             claim_text=claim.claim_text,
-            created_at=u256(int(claim.created_at)),
+            claim_created_seq=u256(int(claim.created_seq)),
             adjudicated_at=u256(int(adj.adjudicated_at)),
-            finalized_at=u256(now),
+            finalized_at=u256(observed),
             evidence_snapshot_hash=adj.evidence_snapshot_hash,
+            content_binding_hash=adj.content_binding_hash,
         )
 
         claim.status = S_FINALIZED
         claim.current_attestation_id = attestation_id
-        claim.finalized_at = u256(now)
-        claim.updated_at = u256(self._tick(1))
+        claim.finalized_at = u256(observed)
+        self._touch(claim)
         return attestation_id
 
     # ══════════════════════════════════════════════════════════════════════
@@ -1434,14 +1665,15 @@ class Attestia(gl.Contract):
         return {
             "version": self.version,
             "claim_count": len(self.claim_ids),
-            "protocol_clock": int(self.protocol_clock),
+            "clock_source": CLOCK_URL,
+            "clock_tolerance_seconds": CLOCK_TOLERANCE,
             "verdicts": sorted(VALID_VERDICTS),
             "states": sorted(VALID_STATES),
             "evidence_statuses": sorted(VALID_EVIDENCE_STATUS),
             "relationships": sorted(VALID_RELATIONSHIPS),
             "retrieval_outcomes": sorted(VALID_FETCH),
             "challenge_statuses": sorted(VALID_CHALLENGE_STATUS),
-            "challenge_window_seconds": CHALLENGE_WINDOW,
+            "default_challenge_window_seconds": DEFAULT_CHALLENGE_WINDOW,
             "default_evidence_window_seconds": DEFAULT_EVIDENCE_WINDOW,
             "max_evidence_per_version": MAX_EVIDENCE_PER_VERSION,
             "max_versions": MAX_VERSIONS,
@@ -1456,10 +1688,12 @@ class Attestia(gl.Contract):
             "creator": str(claim.creator),
             "status": claim.status,
             "current_version": int(claim.current_version),
-            "created_at": int(claim.created_at),
-            "updated_at": int(claim.updated_at),
+            "created_seq": int(claim.created_seq),
+            "updated_seq": int(claim.updated_seq),
+            "evidence_window_seconds": int(claim.evidence_window_seconds),
+            "challenge_window_seconds": int(claim.challenge_window_seconds),
+            "opened_at": int(claim.opened_at),
             "evidence_deadline": int(claim.evidence_deadline),
-            "adjudication_started_at": int(claim.adjudication_started_at),
             "adjudicated_at": int(claim.adjudicated_at),
             "challenge_deadline": int(claim.challenge_deadline),
             "finalized_at": int(claim.finalized_at),
@@ -1470,11 +1704,12 @@ class Attestia(gl.Contract):
             "current_verdict": claim.current_verdict,
             "current_adjudication_id": claim.current_adjudication_id,
             "current_attestation_id": claim.current_attestation_id,
-            "protocol_clock": int(self.protocol_clock),
-            "evidence_window_open": (
-                claim.status in EVIDENCE_OPEN_STATES
-                and int(self.protocol_clock) <= int(claim.evidence_deadline)
-            ),
+            # Whether the record is still accepting submissions is a
+            # question about STATE, not about the clock: while a claim is
+            # OPEN it accepts evidence, and the deadline only governs who
+            # is allowed to close it. Reporting it this way keeps the UI
+            # from implying a countdown the contract does not enforce.
+            "evidence_window_open": claim.status in EVIDENCE_OPEN_STATES,
         }
 
     def _evidence_row(self, ev: Evidence) -> dict:
@@ -1485,7 +1720,7 @@ class Attestia(gl.Contract):
             "source_url": ev.source_url,
             "source_type": ev.source_type,
             "description": ev.description,
-            "submitted_at": int(ev.submitted_at),
+            "submitted_seq": int(ev.submitted_seq),
             "claim_version": int(ev.claim_version),
             "status": ev.status,
             # Named so a UI cannot present a submitter's assertion as a
@@ -1494,6 +1729,10 @@ class Attestia(gl.Contract):
             "adjudicated_relationship": ev.adjudicated_relationship,
             "adjudicated_in": ev.adjudicated_in,
             "retrieval": ev.retrieval,
+            # sha256 of the canonical text the panel actually read. Empty
+            # means nothing was read, which is not the same as "read and
+            # found wanting" — the UI must not conflate them.
+            "content_digest": ev.content_digest,
         }
 
     @gl.public.view
@@ -1535,6 +1774,8 @@ class Attestia(gl.Contract):
             "unavailable_evidence": _load_list(adj.unavailable_json),
             "evidence_snapshot": _load_list(adj.evidence_snapshot_json),
             "evidence_snapshot_hash": adj.evidence_snapshot_hash,
+            "content_bindings": _load_list(adj.content_binding_json),
+            "content_binding_hash": adj.content_binding_hash,
             "adjudicated_at": int(adj.adjudicated_at),
         }
 
@@ -1573,7 +1814,7 @@ class Attestia(gl.Contract):
             "submitted_by": str(ch.submitted_by),
             "reason": ch.reason,
             "counter_evidence_ids": _load_list(ch.counter_evidence_json),
-            "submitted_at": int(ch.submitted_at),
+            "submitted_seq": int(ch.submitted_seq),
             "status": ch.status,
         }
 
@@ -1601,10 +1842,11 @@ class Attestia(gl.Contract):
             "adjudication_id": att.adjudication_id,
             "evidence_count": int(att.evidence_count),
             "challenge_count": int(att.challenge_count),
-            "created_at": int(att.created_at),
+            "claim_created_seq": int(att.claim_created_seq),
             "adjudicated_at": int(att.adjudicated_at),
             "finalized_at": int(att.finalized_at),
             "evidence_snapshot_hash": att.evidence_snapshot_hash,
+            "content_binding_hash": att.content_binding_hash,
             "contract": str(gl.message.contract_address),
         }
 
@@ -1648,6 +1890,12 @@ class Attestia(gl.Contract):
                 problems.append("adjudication judged a different version")
             if adj.evidence_snapshot_hash != att.evidence_snapshot_hash:
                 problems.append("evidence snapshot hash does not match")
+            if adj.content_binding_hash != att.content_binding_hash:
+                problems.append("content binding hash does not match")
+            # An attestation with no content binding rests on nothing that
+            # was read. It is reported as unverifiable rather than valid.
+            if not att.content_binding_hash:
+                problems.append("attestation carries no evidence binding")
 
         return {
             "attestation_id": att.attestation_id,
@@ -1659,9 +1907,42 @@ class Attestia(gl.Contract):
             "challenge_count": int(att.challenge_count),
             "adjudication_id": att.adjudication_id,
             "evidence_snapshot_hash": att.evidence_snapshot_hash,
+            "content_binding_hash": att.content_binding_hash,
             "valid": not problems,
             "reason": "verified against protocol state" if not problems
                       else "; ".join(problems),
+        }
+
+    @gl.public.view
+    def check_evidence_binding(self, evidence_id: str,
+                               content_digest: str) -> dict:
+        """Does a given content digest match what the verdict was built on?
+
+        This is the tamper check in the open: anyone holding a document
+        can canonicalise it, hash it, and ask the contract whether that is
+        the document the panel read. A verdict over content X cannot be
+        presented as a verdict over modified content Y, because Y hashes
+        differently and this call says so.
+        """
+        eid = _clip(evidence_id, MAX_ID)
+        if eid not in self.evidence:
+            raise _expected(f"unknown evidence {eid!r}")
+        ev = self.evidence[eid]
+        supplied = _clip(content_digest, 128).strip().lower()
+        bound = str(ev.content_digest).strip().lower()
+        return {
+            "evidence_id": ev.evidence_id,
+            "claim_id": ev.claim_id,
+            "claim_version": int(ev.claim_version),
+            "adjudicated_in": ev.adjudicated_in,
+            "bound_digest": bound,
+            "supplied_digest": supplied,
+            "bound": bool(bound),
+            "matches": bool(bound) and bool(supplied) and bound == supplied,
+            "reason": ("no adjudication has read this source yet" if not bound
+                       else "digest matches the content the panel read"
+                       if bound == supplied
+                       else "digest does NOT match the content the panel read"),
         }
 
     @gl.public.view
@@ -1735,7 +2016,7 @@ class Attestia(gl.Contract):
                 "current_verdict": claim.current_verdict,
                 "evidence_count": int(claim.evidence_count),
                 "challenge_count": int(claim.challenge_count),
-                "created_at": int(claim.created_at),
+                "created_seq": int(claim.created_seq),
                 "finalized_at": int(claim.finalized_at),
             })
         return {"total": total, "offset": start, "count": len(rows), "rows": rows}

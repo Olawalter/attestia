@@ -1,5 +1,5 @@
 """§47 — evidence: submission, binding, duplicates, removal, freezing."""
-from .conftest import CLAIM_TEXT, GOOD_URL, OTHER_URL
+from .conftest import BASE_TS, CLAIM_TEXT, GOOD_URL, OTHER_URL, at_time
 
 
 def _submit(deployed, claim_id, url=GOOD_URL, kind="OFFICIAL_ANNOUNCEMENT",
@@ -74,13 +74,21 @@ def test_evidence_rejected_on_a_draft_claim(direct_vm, deployed, direct_bob,
         _submit(deployed, drafted)
 
 
-def test_evidence_rejected_after_the_window_closes(
+def test_evidence_is_accepted_while_the_claim_is_open(
     direct_vm, deployed, direct_bob, opened
 ):
+    """The window bounds how long the record STAYS open, not each filing.
+
+    Enforcing a deadline per submission would put a consensus round in
+    front of every filing and buy nothing: a source filed a second before
+    closing is as legitimate as one filed an hour earlier. What the
+    deadline governs is who may close — see the force-close tests.
+    """
+    at_time(direct_vm, BASE_TS + 7200)    # past the 3600s window
     direct_vm.sender = direct_bob
-    deployed.advance_clock(7200)          # past the 3600s window
-    with direct_vm.expect_revert("evidence window closed"):
-        _submit(deployed, opened)
+    eid = _submit(deployed, opened)
+    assert deployed.get_evidence(eid)["status"] == "ACTIVE"
+    assert deployed.get_claim(opened)["status"] == "OPEN"
 
 
 def test_only_the_submitter_may_remove(direct_vm, deployed, direct_bob,
@@ -144,17 +152,39 @@ def test_empty_record_cannot_be_closed(direct_vm, deployed, direct_alice, opened
         deployed.close_evidence(opened)
 
 
-def test_non_creator_may_close_only_after_the_deadline(
+def test_non_creator_cannot_close_a_claim_they_do_not_own(
     direct_vm, deployed, direct_bob, opened
 ):
+    """STEWARD FIX — `close_evidence` is now creator-only."""
     direct_vm.sender = direct_bob
     _submit(deployed, opened)
 
-    with direct_vm.expect_revert("only the creator may close early"):
+    with direct_vm.expect_revert("only the claim creator"):
         deployed.close_evidence(opened)
+    assert deployed.get_claim(opened)["status"] == "OPEN"
 
-    deployed.advance_clock(7200)
-    deployed.close_evidence(opened)
+
+def test_force_close_needs_consensus_to_confirm_the_window_elapsed(
+    direct_vm, deployed, direct_bob, opened
+):
+    """Liveness without a manipulable clock.
+
+    Anyone may force a stalled claim closed — and precisely BECAUSE anyone
+    may call it, the deadline it checks is read from consensus rather than
+    supplied by the caller.
+    """
+    direct_vm.sender = direct_bob
+    _submit(deployed, opened)
+
+    # Inside the window: refused, no matter who asks.
+    at_time(direct_vm, BASE_TS + 60)
+    with direct_vm.expect_revert("evidence window runs to"):
+        deployed.force_close_evidence(opened)
+    assert deployed.get_claim(opened)["status"] == "OPEN"
+
+    # Once the window has genuinely elapsed, it works.
+    at_time(direct_vm, BASE_TS + 7200)
+    deployed.force_close_evidence(opened)
     assert deployed.get_claim(opened)["status"] == "EVIDENCE_CLOSED"
 
 

@@ -13,7 +13,7 @@ import type { CalldataEncodable, TransactionHash } from "genlayer-js/types";
 import { getContractAddress, readClient, writeClient } from "../genlayer/client";
 import type { Eip1193Provider } from "../genlayer/wallet";
 import type {
-  Adjudication, Attestation, AttestationCheck, Challenge, Claim, ClaimHistory,
+  Adjudication, Attestation, AttestationCheck, BindingCheck, Challenge, Claim, ClaimHistory,
   ClaimPage, ClaimVerdict, Evidence, ProtocolInfo, TxPhase,
 } from "./types";
 
@@ -77,6 +77,8 @@ export const getClaimVerdict = (claimId: string) =>
   read<ClaimVerdict>("get_claim_verdict", [claimId]);
 export const getClaimHistory = (claimId: string) =>
   read<ClaimHistory>("get_claim_history", [claimId]);
+export const checkEvidenceBinding = (evidenceId: string, contentDigest: string) =>
+  read<BindingCheck>("check_evidence_binding", [evidenceId, contentDigest]);
 
 // ─── writes (§34) ───────────────────────────────────────────────────────
 
@@ -179,8 +181,10 @@ export function revertReason(receipt: Record<string, unknown>): string | null {
 }
 
 // One wrapper per write method, matching the deployed schema exactly.
-export const createClaim = (text: string, windowSeconds: number, ctx: WriteContext) =>
-  runWrite("create_claim", [text, windowSeconds], ctx);
+export const createClaim = (
+  text: string, windowSeconds: number, challengeWindowSeconds: number,
+  ctx: WriteContext,
+) => runWrite("create_claim", [text, windowSeconds, challengeWindowSeconds], ctx);
 
 export const openClaim = (claimId: string, ctx: WriteContext) =>
   runWrite("open_claim", [claimId], ctx);
@@ -213,5 +217,7 @@ export const submitChallenge = (
 export const finalizeClaim = (claimId: string, ctx: WriteContext) =>
   runWrite("finalize_claim", [claimId], ctx);
 
-export const advanceClock = (seconds: number, ctx: WriteContext) =>
-  runWrite("advance_clock", [seconds], ctx);
+// STEWARD FIX: `advance_clock` is gone. Nothing here can set protocol
+// time; the contract observes it through consensus.
+export const forceCloseEvidence = (claimId: string, ctx: WriteContext) =>
+  runWrite("force_close_evidence", [claimId], ctx);

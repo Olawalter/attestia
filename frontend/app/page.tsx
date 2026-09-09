@@ -50,11 +50,10 @@ export default function Home() {
         <div className="grid gap-px border border-rule bg-rule sm:grid-cols-4">
           <Stat label="Claims on record"
                 value={infoLoading ? null : info?.claim_count ?? 0} />
-          <Stat label="Protocol clock"
-                value={infoLoading ? null : `${info?.protocol_clock ?? 0}s`} />
-          <Stat label="Challenge window"
+          <Stat label="Clock" value={infoLoading ? null : "consensus-observed"} />
+          <Stat label="Default challenge window"
                 value={infoLoading ? null
-                  : `${Math.round((info?.challenge_window_seconds ?? 0) / 86400)}d`} />
+                  : `${Math.round((info?.default_challenge_window_seconds ?? 0) / 86400)}d`} />
           <Stat label="Protocol version"
                 value={infoLoading ? null : info?.version ?? "Unavailable"} />
         </div>

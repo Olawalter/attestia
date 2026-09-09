@@ -167,8 +167,9 @@ npm run dev                              # http://localhost:3150
 
 ```text
 genvm-lint check      passes — 23 methods (13 view, 10 write)
-pytest tests/direct   71 passed, offline
-gltest tests/integr.  7 passed on StudioNet, real panel (7m50s)
+pytest tests/direct   89 passed, offline
+gltest tests/integr.  7 passed on StudioNet, real panel  (11m09s)
+npm run test:wallet   5 passed — the selected wallet signs
 tsc --noEmit          clean
 next build            clean, 6 routes
 ```
@@ -191,17 +192,17 @@ assumptions this protocol does not hide.
 ## 11. Deployment
 
 - Network: **GenLayer StudioNet** (chain id 61999)
-- Contract: `0x1685CC12792e2cd275eadc7FbCfa63A8317152D3`
+- Contract: `0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9`
 - Deploy tx: `0x10cac1daaafb7e7f6f1a818e4d361bbf84401cd2d903fe0cca916e4b27a41870`
 - Consensus on deploy: 5 validators, 5 AGREE
 - Runner: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
-- Source sha256: `370a8905896abf472e6ca6f794321533a410ce4f852519d79cc15fa9b4a6f6d6`
+- Source sha256: `4b3d78cadc9fafd704f0ee6cc535d580350a5ba939d3458d9d9d2dc2cde00899`
 
 An address in a README is a claim until someone checks it, so the check
 ships with the repository:
 
 ```bash
-genlayer code 0x1685CC12792e2cd275eadc7FbCfa63A8317152D3 > onchain.py
+genlayer code 0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9 > onchain.py
 python scripts/verify_deployment.py onchain.py
 # MATCH   sha256 370a8905896abf472e6ca6f794321533a410ce4f852519d79cc15fa9b4a6f6d6
 ```
@@ -234,18 +235,27 @@ Stated rather than left implicit.
 - **Protocol time is a tick counter, not a wall clock.** The pinned GenVM
   runner exposes no deterministic timestamp — `gl.vm.get_timestamp()` is
   documented for v0.3.0 but absent from the runner's std lib, and
-  `gl.message` carries no `datetime`. Deadlines are therefore absolute
-  values on a monotonic clock in seconds that transactions advance.
-  `advance_clock` is public and unprivileged, because a deadline nobody
-  can reach is not a deadline. Both facts were checked against the
-  extracted runner, not assumed.
+  `gl.message` carries no `datetime`. Both facts were checked against the
+  extracted runner, not assumed. Deadlines are therefore real UTC seconds
+  **observed through a validator round**: the leader reads a public
+  clock, every validator reads it independently, and the round lands only
+  if they agree within five minutes. The residual dependency is that time
+  source — readings are range-checked and cross-validated, which bounds
+  the exposure without removing it.
 - **`retrieval` records what the panel reported, not what the contract
   saw.** Deterministic code cannot fetch anything; retrieval happens
   inside the nondeterministic block. The field means "the panel reported
   it could not read this source", and that is what the UI says.
-- **Content hashes are not verified.** Attestia stores no submitter hash
-  claim at all, precisely to avoid implying one was checked. What
-  establishes anything is validators retrieving the source themselves.
+- **Verdicts are bound to the content that produced them.** Each round
+  digests the canonical text every node retrieved and carries that map in
+  the consensus fingerprint, so a verdict names the bytes it rests on and
+  validators that read different bytes cannot agree at all.
+  `check_evidence_binding` lets anyone test a document against what the
+  panel read. What is still NOT verified is a submitter's own hash claim —
+  Attestia stores none, precisely to avoid implying one was checked.
+- **A source that changes between rounds breaks consensus rather than
+  passing quietly.** That is deliberate (§18 fail-closed), but it does
+  mean a genuinely volatile page cannot be attested to.
 - **A captured validator majority can agree on a false verdict.** That is
   GenLayer's trust model, not something a contract fixes from inside. The
   challenge-and-version mechanism exists so a bad verdict can be

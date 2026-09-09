@@ -7,7 +7,8 @@
     "dev": "next dev -p 3150",
     "build": "next build",
     "start": "next start -p 3150",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:wallet": "node --test --experimental-strip-types tests/wallet-provider.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

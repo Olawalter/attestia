@@ -49,15 +49,42 @@ export function readClient() {
 }
 
 /**
- * A client bound to the connected wallet, for writes.
+ * A client bound to the SELECTED wallet, for writes.
  *
- * genlayer-js takes the account address and routes signing through the
- * injected provider; the app never sees key material.
+ * STEWARD FIX (wallet trust).
+ *
+ * This function used to take the provider and throw it away — the
+ * parameter was literally named `_provider` — on the assumption that
+ * genlayer-js would route signing through whatever the user had
+ * connected. It does not. Its own source reads:
+ *
+ *     const provider = config.provider
+ *       || (typeof window !== "undefined" ? window.ethereum : void 0);
+ *
+ * so omitting `provider` falls back to `window.ethereum`. With two
+ * wallets installed that global is whichever extension won the injection
+ * race, which meant a user could select Rabby in our picker and have
+ * MetaMask sign. Connection was never the problem; signing was.
+ *
+ * Passing the selected provider explicitly is the whole fix: `config.provider`
+ * takes precedence, so the wallet the user chose is the wallet that signs.
+ * The app still never sees key material — the provider does the signing.
  */
-export function writeClient(account: string, _provider: Eip1193Provider) {
+export function writeClient(account: string, provider: Eip1193Provider) {
+  if (!provider) {
+    // Fail closed rather than let the fallback pick a wallet for the user.
+    throw new Error(
+      "No wallet provider supplied — refusing to fall back to window.ethereum.",
+    );
+  }
   return createClient({
     chain: studionet,
     endpoint: RPC_URL,
     account: account as `0x${string}`,
+    // Structural pass-through: genlayer-js types this as its internal
+    // EthereumProvider, which it does not export. Our Eip1193Provider is
+    // the same shape (`request`, plus optional `on`/`removeListener`).
+    provider: provider as unknown as
+      NonNullable<Parameters<typeof createClient>[0]>["provider"],
   });
 }

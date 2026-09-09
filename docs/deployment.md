@@ -178,7 +178,7 @@ zero edges on a completely healthy graph.
 | | |
 |---|---|
 | Network | GenLayer StudioNet, chain id 61999 |
-| Address | `0x1685CC12792e2cd275eadc7FbCfa63A8317152D3` |
+| Address | `0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9` |
 | Deploy tx | `0x10cac1daaafb7e7f6f1a818e4d361bbf84401cd2d903fe0cca916e4b27a41870` |
 | Consensus | 5 validators, 5 AGREE |
 | Runner | `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6` |

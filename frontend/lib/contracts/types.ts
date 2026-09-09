@@ -44,14 +44,16 @@ export type ChallengeStatus = "OPEN" | "ACCEPTED" | "REJECTED" | "SUPERSEDED";
 export interface ProtocolInfo {
   version: string;
   claim_count: number;
-  protocol_clock: number;
+  /** Where the protocol reads time from. No caller can set it. */
+  clock_source: string;
+  clock_tolerance_seconds: number;
   verdicts: string[];
   states: string[];
   evidence_statuses: string[];
   relationships: string[];
   retrieval_outcomes: string[];
   challenge_statuses: string[];
-  challenge_window_seconds: number;
+  default_challenge_window_seconds: number;
   default_evidence_window_seconds: number;
   max_evidence_per_version: number;
   max_versions: number;
@@ -63,10 +65,13 @@ export interface Claim {
   creator: string;
   status: ClaimStatus;
   current_version: number;
-  created_at: number;
-  updated_at: number;
+  /** Ordering, not time — a sequence cannot be mistaken for a clock. */
+  created_seq: number;
+  updated_seq: number;
+  evidence_window_seconds: number;
+  /** Real UTC seconds, observed through consensus. 0 until reached. */
+  opened_at: number;
   evidence_deadline: number;
-  adjudication_started_at: number;
   adjudicated_at: number;
   challenge_deadline: number;
   finalized_at: number;
@@ -77,7 +82,6 @@ export interface Claim {
   current_verdict: Verdict;
   current_adjudication_id: string;
   current_attestation_id: string;
-  protocol_clock: number;
   evidence_window_open: boolean;
 }
 
@@ -90,7 +94,7 @@ export interface ClaimSummary {
   current_verdict: Verdict;
   evidence_count: number;
   challenge_count: number;
-  created_at: number;
+  created_seq: number;
   finalized_at: number;
 }
 
@@ -108,7 +112,7 @@ export interface Evidence {
   source_url: string;
   source_type: string;
   description: string;
-  submitted_at: number;
+  submitted_seq: number;
   claim_version: number;
   status: EvidenceStatus;
   /** What the submitter asserted. Never authoritative (§15, §39). */
@@ -117,6 +121,8 @@ export interface Evidence {
   adjudicated_relationship: Relationship;
   adjudicated_in: string;
   retrieval: Retrieval;
+  /** sha256 of the canonical text the panel read. "" = nothing was read. */
+  content_digest: string;
 }
 
 export interface Adjudication {
@@ -134,6 +140,9 @@ export interface Adjudication {
   unavailable_evidence: string[];
   evidence_snapshot: Array<Record<string, unknown>>;
   evidence_snapshot_hash: string;
+  /** What the panel actually read, per source (§14). */
+  content_bindings: Array<{ evidence_id: string; retrieval: string; digest: string }>;
+  content_binding_hash: string;
   adjudicated_at: number;
 }
 
@@ -145,7 +154,7 @@ export interface Challenge {
   submitted_by: string;
   reason: string;
   counter_evidence_ids: string[];
-  submitted_at: number;
+  submitted_seq: number;
   status: ChallengeStatus;
 }
 
@@ -158,10 +167,11 @@ export interface Attestation {
   adjudication_id: string;
   evidence_count: number;
   challenge_count: number;
-  created_at: number;
+  claim_created_seq: number;
   adjudicated_at: number;
   finalized_at: number;
   evidence_snapshot_hash: string;
+  content_binding_hash: string;
   contract: string;
 }
 
@@ -176,6 +186,7 @@ export interface AttestationCheck {
   challenge_count?: number;
   adjudication_id?: string;
   evidence_snapshot_hash?: string;
+  content_binding_hash?: string;
   valid: boolean;
   reason: string;
 }
@@ -230,3 +241,16 @@ export type TxPhase =
   | "reverted"
   | "rejected"
   | "failed";
+
+/** §19 — the public tamper check. */
+export interface BindingCheck {
+  evidence_id: string;
+  claim_id: string;
+  claim_version: number;
+  adjudicated_in: string;
+  bound_digest: string;
+  supplied_digest: string;
+  bound: boolean;
+  matches: boolean;
+  reason: string;
+}

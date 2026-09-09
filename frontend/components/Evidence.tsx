@@ -10,7 +10,7 @@
  * weight. Before a ruling there is simply nothing in that position.
  */
 import { RelationshipTag, RetrievalTag, SourceLink } from "./ui";
-import { hostOf, protocolTime, shortAddress } from "@/lib/utils";
+import { hostOf, seq, shortAddress } from "@/lib/utils";
 import type { Evidence } from "@/lib/contracts/types";
 
 export function EvidenceCard({ evidence }: { evidence: Evidence }) {
@@ -52,9 +52,9 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
           </dd>
         </div>
         <div>
-          <dt className="label">Submitted</dt>
+          <dt className="label">Filed</dt>
           <dd className="mt-1 font-mono text-[11px] text-paper-muted">
-            {protocolTime(evidence.submitted_at)}
+            {seq(evidence.submitted_seq)}
           </dd>
         </div>
         <div>
@@ -83,6 +83,18 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
           <span className="label shrink-0">Submitter asserts</span>
           <RelationshipTag value={evidence.declared_relationship} adjudicated={false} />
         </div>
+
+        {/* The verdict is bound to THIS text, not to the URL. Showing the
+            digest is what lets a reader check the source has not changed
+            since it was judged. */}
+        {evidence.content_digest && (
+          <div className="flex items-baseline gap-2">
+            <span className="label shrink-0">Content read</span>
+            <span className="break-all font-mono text-[10px] text-paper-faint">
+              sha256:{evidence.content_digest.slice(0, 24)}…
+            </span>
+          </div>
+        )}
       </div>
 
       <footer className="mt-4 flex items-center justify-between gap-4 border-t border-rule pt-3">

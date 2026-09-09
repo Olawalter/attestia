@@ -19,6 +19,13 @@ import { TxTrack } from "@/components/TxTrack";
 
 const MAX_CLAIM = 1000;
 
+const CONTEST_WINDOWS = [
+  { label: "2 minutes", seconds: 120 },
+  { label: "1 hour", seconds: 3600 },
+  { label: "1 day", seconds: 86400 },
+  { label: "3 days", seconds: 3 * 86400 },
+];
+
 const WINDOWS = [
   { label: "1 hour", seconds: 3600 },
   { label: "1 day", seconds: 86400 },
@@ -31,6 +38,7 @@ export default function NewClaimPage() {
   const { tx, run, busy } = useContractWrite();
   const [text, setText] = useState("");
   const [window, setWindow] = useState(3600);
+  const [contest, setContest] = useState(3 * 24 * 3600);
   const [claimId, setClaimId] = useState("");
 
   const tooLong = text.length > MAX_CLAIM;
@@ -38,7 +46,7 @@ export default function NewClaimPage() {
 
   async function createClaim() {
     const result = await run({
-      run: (ctx) => api.createClaim(text.trim(), window, ctx),
+      run: (ctx) => api.createClaim(text.trim(), window, contest, ctx),
       invalidate: [keys.info, ["claims"]],
     });
     if (result.phase === "finalized") {
@@ -111,9 +119,37 @@ export default function NewClaimPage() {
                 ))}
               </div>
               <p className="mt-2 text-xs leading-relaxed text-paper-faint">
-                How long the record stays open for submissions. Measured in
-                protocol time, which advances with transactions rather than with
-                the clock on your wall — the contract explains why.
+                How long the record stays open for submissions, in real
+                seconds. The deadline is checked against a clock the
+                validator panel reads — not one anybody at a keyboard can
+                move.
+              </p>
+            </div>
+
+            <div>
+              <span className="label">Challenge window</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {CONTEST_WINDOWS.map((option) => (
+                  <button
+                    key={option.seconds}
+                    type="button"
+                    disabled={Boolean(claimId)}
+                    onClick={() => setContest(option.seconds)}
+                    className={`border px-3 py-1.5 font-mono text-xs transition-colors
+                      disabled:opacity-50 ${
+                      contest === option.seconds
+                        ? "border-gold text-gold"
+                        : "border-rule text-paper-muted hover:border-rule-strong"}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-paper-faint">
+                How long your verdict may be contested. You choose it now,
+                before anyone knows what the verdict will be, and it is
+                frozen at creation — neither you nor anyone else can
+                shorten it afterwards.
               </p>
             </div>
 

@@ -20,7 +20,7 @@ import {
   useChallenges as useChallengeList, useContractWrite, useEvidence,
   useRelatedCases,
 } from "@/lib/hooks/useAttestia";
-import { duration, protocolTime, shortAddress } from "@/lib/utils";
+import { duration, seq, shortAddress, utcTime } from "@/lib/utils";
 import {
   Banner, Button, Card, CardHead, Empty, Field, LinkButton, StatusPill,
   VerdictStamp,
@@ -214,7 +214,7 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
                       <p className="text-sm leading-relaxed text-paper">{ch.reason}</p>
                       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                         <Field label="Filed by" mono>{shortAddress(ch.submitted_by)}</Field>
-                        <Field label="Filed" mono>{protocolTime(ch.submitted_at)}</Field>
+                        <Field label="Filed" mono>{seq(ch.submitted_seq)}</Field>
                         <Field label="Counter-evidence" mono>
                           {ch.counter_evidence_ids.length || "none"}
                         </Field>
@@ -303,19 +303,21 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
             <CardHead>Case record</CardHead>
             <dl className="space-y-3 p-4">
               <Field label="Creator" mono>{shortAddress(claim.creator)}</Field>
-              <Field label="Filed" mono>{protocolTime(claim.created_at)}</Field>
+              <Field label="Filed" mono>{seq(claim.created_seq)}</Field>
+              {claim.opened_at > 0 && (
+                <Field label="Opened" mono>{utcTime(claim.opened_at)}</Field>
+              )}
               <Field label="Evidence deadline" mono>
-                {protocolTime(claim.evidence_deadline)}
+                {utcTime(claim.evidence_deadline)}
                 {claim.evidence_window_open && (
                   <span className="ml-2 text-verdict-supported">open</span>
                 )}
               </Field>
               {claim.challenge_deadline > 0 && (
                 <Field label="Challenge window closes" mono>
-                  {protocolTime(claim.challenge_deadline)}
+                  {utcTime(claim.challenge_deadline)}
                 </Field>
               )}
-              <Field label="Protocol clock" mono>{claim.protocol_clock}s</Field>
             </dl>
           </Card>
 
@@ -425,15 +427,21 @@ function AdjudicatedActions({ claim, invalidate, run, busy }: {
   const [description, setDescription] = useState("");
   const id = claim.claim_id;
 
-  const windowOpen = claim.protocol_clock <= claim.challenge_deadline;
-  const remaining = Math.max(0, claim.challenge_deadline - claim.protocol_clock);
+  // The browser's own clock is used only to HINT which action is likely
+  // to succeed. It is never authoritative: the contract decides against a
+  // consensus-observed time, and if the hint is wrong the write reverts
+  // with the real reason (§59).
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const likelyOpen = nowSeconds <= claim.challenge_deadline;
+  const remaining = Math.max(0, claim.challenge_deadline - nowSeconds);
 
   return (
     <div className="space-y-4">
-      {windowOpen ? (
+      {likelyOpen && (
         <div className="space-y-2.5">
           <p className="text-xs text-paper-muted">
-            Challenge window open for {duration(remaining)} of protocol time.
+            Challenge window closes {utcTime(claim.challenge_deadline)}
+            {remaining > 0 ? ` — about ${duration(remaining)} from now` : ""}.
           </p>
           <textarea
             value={reason}
@@ -479,29 +487,20 @@ function AdjudicatedActions({ claim, invalidate, run, busy }: {
             Challenge this verdict
           </Button>
         </div>
-      ) : (
+      )}
+
+      <div className="border-t border-rule pt-3">
         <Button variant="gold" disabled={busy}
                 onClick={() => run({
                   run: (ctx) => api.finalizeClaim(id, ctx), invalidate,
                 })}>
           Finalize and mint attestation
         </Button>
-      )}
-
-      <div className="border-t border-rule pt-3">
-        <p className="mb-2 text-[11px] leading-relaxed text-paper-faint">
-          Deadlines run on protocol time, which only moves when a transaction
-          moves it. Anyone may advance it — a deadline nobody can reach is not
-          a deadline.
+        <p className="mt-2 text-[11px] leading-relaxed text-paper-faint">
+          Finalizing asks the validator panel what time it is and refuses if
+          the challenge window has not actually closed. Nobody — not you,
+          not the claim&apos;s creator — can bring that moment forward.
         </p>
-        <Button size="sm" variant="ghost" disabled={busy}
-                onClick={() => run({
-                  run: (ctx) => api.advanceClock(
-                    Math.max(60, remaining + 60), ctx),
-                  invalidate,
-                })}>
-          Advance past the window
-        </Button>
       </div>
     </div>
   );

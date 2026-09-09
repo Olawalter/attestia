@@ -1,7 +1,7 @@
 """§47 — claims: creation, validation, permissions, reads."""
 import pytest
 
-from .conftest import CLAIM_TEXT
+from .conftest import BASE_TS, CLAIM_TEXT, at_time
 
 
 def test_create_claim_records_the_case(direct_vm, deployed, direct_alice):
@@ -50,10 +50,13 @@ def test_invalid_evidence_window_rejected(direct_vm, deployed, direct_alice):
 
 
 def test_default_evidence_window_applied(direct_vm, deployed, direct_alice):
+    """The window is recorded as a DURATION at creation; it only becomes a
+    deadline when the claim is opened and a real time is observed."""
     direct_vm.sender = direct_alice
     claim_id = deployed.create_claim(CLAIM_TEXT, 0)
     claim = deployed.get_claim(claim_id)
-    assert claim["evidence_deadline"] - claim["created_at"] == 7 * 24 * 60 * 60
+    assert claim["evidence_window_seconds"] == 7 * 24 * 60 * 60
+    assert claim["evidence_deadline"] == 0, "a draft claim has no deadline running"
 
 
 def test_only_creator_may_open(direct_vm, deployed, direct_bob, drafted):
@@ -62,16 +65,21 @@ def test_only_creator_may_open(direct_vm, deployed, direct_bob, drafted):
         deployed.open_claim(drafted)
 
 
-def test_open_moves_to_open_and_starts_the_window(
+def test_open_moves_to_open_and_anchors_the_window(
     direct_vm, deployed, direct_alice, drafted
 ):
+    """Opening is where the one timestamp a claim needs is anchored, and it
+    comes from consensus rather than from the caller."""
+    at_time(direct_vm, BASE_TS)
     direct_vm.sender = direct_alice
-    deployed.open_claim(drafted)
+    opened_at = deployed.open_claim(drafted)
 
     claim = deployed.get_claim(drafted)
     assert claim["status"] == "OPEN"
     assert claim["evidence_window_open"] is True
-    assert claim["evidence_deadline"] > claim["protocol_clock"]
+    assert opened_at == BASE_TS, "the anchor is the observed time"
+    assert claim["opened_at"] == BASE_TS
+    assert claim["evidence_deadline"] == BASE_TS + 3600
 
 
 def test_cannot_open_twice(direct_vm, deployed, direct_alice, opened):
@@ -85,23 +93,41 @@ def test_unknown_claim_reverts(direct_vm, deployed, direct_alice):
         deployed.get_claim("claim_999999")
 
 
-def test_clock_only_moves_forward(direct_vm, deployed, direct_alice):
-    """§12 — the protocol clock is monotonic and permissionless."""
+def test_there_is_no_clock_to_manipulate(direct_vm, deployed, direct_alice):
+    """STEWARD FIX — the caller-controlled clock is gone from the surface.
+
+    `advance_clock` used to be public and unprivileged, which is what let
+    one account expire everyone else's deadlines. The regression this
+    guards is someone reintroducing it for convenience.
+    """
     direct_vm.sender = direct_alice
-    before = deployed.get_protocol_info()["protocol_clock"]
-    after = deployed.advance_clock(600)
-    assert after >= before + 600
+    assert not hasattr(deployed, "advance_clock"),         "a caller-settable clock must not exist on the contract surface"
 
-    with direct_vm.expect_revert("clock may only move forward"):
-        deployed.advance_clock(0)
-    with direct_vm.expect_revert("clock may only move forward"):
-        deployed.advance_clock(-5)
+    info = deployed.get_protocol_info()
+    assert "protocol_clock" not in info,         "no global clock may be exposed as protocol state"
+    # What IS exposed is where time comes from, so it can be audited.
+    assert info["clock_source"].startswith("https://")
+    assert info["clock_tolerance_seconds"] > 0
 
 
-def test_anyone_may_advance_the_clock(direct_vm, deployed, direct_bob, opened):
-    """A deadline nobody can reach is not a deadline."""
-    direct_vm.sender = direct_bob
-    assert deployed.advance_clock(120) > 0
+def test_opening_requires_a_readable_clock(direct_vm, deployed, direct_alice,
+                                           drafted):
+    """§18 fail-closed: no trustworthy time, no anchored window."""
+    direct_vm.clear_mocks()
+    direct_vm.mock_web(r".*", {"status": 500, "body": "gateway error"})
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("TRANSIENT"):
+        deployed.open_claim(drafted)
+    assert deployed.get_claim(drafted)["status"] == "DRAFT",         "a failed clock read must leave the claim exactly where it was"
+
+
+def test_absurd_clock_readings_are_refused(direct_vm, deployed, direct_alice,
+                                           drafted):
+    """A time source answering outside the sane range is not a clock."""
+    at_time(direct_vm, 10_000)          # 1970
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("outside the sane range"):
+        deployed.open_claim(drafted)
 
 
 def test_list_claims_paginates(direct_vm, deployed, direct_alice):

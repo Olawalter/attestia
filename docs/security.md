@@ -156,12 +156,35 @@ infrastructure trouble masquerade as a finding.
    checked. The guarantee is that validators read the real URL, not that
    the bytes were notarised.
 4. **`retrieval` is the panel's report, not the contract's observation.**
-   Deterministic code cannot fetch.
-5. **Protocol time is a tick counter.** Deadlines advance with protocol
-   activity, and `advance_clock` is permissionless by design.
+   Deterministic code cannot fetch. What the contract does hold is the
+   `content_digest` the panel derived from what it read, and that digest
+   is part of the consensus fingerprint — so the report is not merely
+   asserted, it had to be reproduced by every validator.
+5. **Protocol time is observed, not chosen.** Deadlines are real UTC
+   seconds read through a validator round; there is no settable clock.
+   The residual assumption is the time SOURCE: a compromised source that
+   fooled every validator simultaneously could shift a deadline by more
+   than the tolerance. Readings are range-checked and cross-validated,
+   which bounds the damage without eliminating the dependency.
 6. **Direct tests exercise the leader path only.** `mock_llm` answers
    leader and validators identically, so real agreement is demonstrated
    by the live suite, not offline.
+
+## Wallet trust
+
+**The wallet a user selects is the wallet that signs.**
+
+genlayer-js resolves a signer as `config.provider || window.ethereum`.
+Omitting `provider` therefore falls back to the injected global — whichever
+extension won the race — so a user could pick Rabby in the picker and have
+MetaMask sign. Connection was never the issue; signing was.
+
+`writeClient()` now passes the selected EIP-6963 provider explicitly, and
+throws rather than falling back when none is supplied. `npm run test:wallet`
+proves the seam against the real library: provider A selected signs as A,
+provider B selected signs as B, and with `window.ethereum` set to A while B
+is selected, **B signs**. A fourth test pins the original defect by building
+a client the old way and showing it answers with the wrong wallet's account.
 
 ## Reporting a vulnerability
 

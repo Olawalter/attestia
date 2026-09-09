@@ -16,6 +16,7 @@ fails for a reason unrelated to correctness.
 """
 import json
 import os
+import time
 
 import pytest
 
@@ -44,9 +45,17 @@ GOOD_URL = (
 DEAD_URL = "https://attestia-source-does-not-exist.invalid/post-mortem.json"
 
 
-def _create_open_claim(contract, hint: str, window: int = 3600) -> str:
+def _create_open_claim(contract, hint: str, window: int = 3600,
+                       contest: int = 120) -> str:
+    """Create and open a claim.
+
+    `contest` is the challenge window, set at creation and frozen there.
+    It is short here so a live run can wait one out honestly — there is no
+    longer any way to skip it.
+    """
     must_succeed(
-        contract.create_claim(args=[f"{CLAIM_TEXT} ({hint})", window]).transact(),
+        contract.create_claim(
+            args=[f"{CLAIM_TEXT} ({hint})", window, contest]).transact(),
         "create_claim")
     page = _read(contract, "list_claims", [0, 100])
     rows = [r for r in page["rows"] if r["claim_text"].endswith(f"({hint})")]
@@ -259,10 +268,22 @@ def test_finalization_mints_a_verifiable_attestation(contract):
 
     adj = _run_panel(contract, claim_id)
 
-    # Deadlines are protocol time; a transaction has to move it (§12).
+    # STEWARD FIX — there is no clock to advance. The challenge window is
+    # measured against a timestamp the validator panel observes, so the
+    # only way past it is for the time to genuinely pass. This claim was
+    # created with a short window precisely so a live test can wait it out.
     claim = _read(contract, "get_claim", [claim_id])
-    step = max(60, claim["challenge_deadline"] - claim["protocol_clock"] + 60)
-    must_succeed(contract.advance_clock(args=[step]).transact(), "advance_clock")
+    assert claim["challenge_deadline"] > 0
+
+    # Finalizing early must be refused by consensus, not by a local check.
+    early = contract.finalize_claim(args=[claim_id]).transact()
+    reason = must_fail(early, "premature finalize_claim")
+    assert "challenge window is open" in reason, reason
+    print(f"  early finalize refused: {reason[:90]}")
+
+    wait_for = max(0, claim["challenge_deadline"] - int(time.time())) + 15
+    print(f"  waiting {wait_for}s for the challenge window to actually close")
+    time.sleep(wait_for)
 
     must_succeed(contract.finalize_claim(args=[claim_id]).transact(),
                  "finalize_claim")

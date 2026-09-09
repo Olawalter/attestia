@@ -78,7 +78,7 @@ from genlayer_py import create_client
 from genlayer_py.chains import studionet
 
 client = create_client(chain=studionet)
-ATTESTIA = "0x1685CC12792e2cd275eadc7FbCfa63A8317152D3"
+ATTESTIA = "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9"
 
 def settled(claim_id: str):
     """Return (verdict, attestation_id) only when it is genuinely final."""
@@ -135,9 +135,18 @@ Two things to build around:
 every validator, then consensus. Poll the claim state rather than
 assuming.
 
-**Deadlines run on protocol time.** `advance_clock(seconds)` moves the
-clock and anyone may call it. An agent waiting for a challenge window to
-close must advance the clock, not sleep.
+**Deadlines run on real UTC seconds, and nobody can move them.** The
+contract observes time through a validator round against a public clock;
+there is no `advance_clock` and no way to set protocol time. An agent
+waiting for a challenge window to close simply waits — `finalize_claim`
+refuses until consensus reads a time past the deadline.
+
+**`check_evidence_binding(evidence_id, content_digest)`** answers the
+question an agent actually needs before trusting an attestation: is the
+document I am holding the document the panel read? Canonicalise the
+source the same way the contract does — strip `<script>`/`<style>`, drop
+tags, collapse whitespace, truncate to 4000 characters — take sha256, and
+compare.
 
 ## What the answer does and does not mean
 

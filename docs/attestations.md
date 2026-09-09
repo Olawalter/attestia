@@ -31,7 +31,9 @@ verification call still checks it against live state.
 `finalize_claim` is deterministic and permissionless, and requires all of:
 
 1. the claim is `ADJUDICATED`;
-2. the challenge window has elapsed on the protocol clock;
+2. the challenge window has elapsed against a CONSENSUS-OBSERVED clock
+   — the panel is asked what time it is, and the caller cannot choose
+   the answer;
 3. no challenge on the claim is still `OPEN`;
 4. `current_adjudication_id` exists and judged the **current** version;
 5. someone sends the transaction.

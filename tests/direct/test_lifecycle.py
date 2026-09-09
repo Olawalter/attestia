@@ -8,7 +8,8 @@ import json
 
 import pytest
 
-from .conftest import GOOD_URL, OTHER_URL, make_result, mock_panel
+from .conftest import (BASE_TS, GOOD_URL, OTHER_URL, at_time,
+                       make_result, mock_panel)
 
 THIRD_URL = "https://audit.example.org/protocol-x-post-mortem"
 
@@ -103,12 +104,38 @@ def test_challenge_requires_a_reason(direct_vm, deployed, direct_charlie,
         deployed.submit_challenge(claim_id, "   ", "[]")
 
 
-def test_challenge_rejected_after_the_window(direct_vm, deployed, direct_charlie,
-                                             adjudicated):
+def test_challenge_admissible_until_the_claim_finalizes(
+    direct_vm, deployed, direct_alice, direct_charlie, adjudicated
+):
+    """STEWARD FIX — a challenger cannot be shut out by someone else's clock.
+
+    The window used to be checked against the global counter, so Bob could
+    advance it and close Alice's right to challenge. Now a challenge is
+    admissible for as long as the claim has not finalized, and finalizing
+    itself requires consensus to confirm the window elapsed. The guarantee
+    moves from "the clock says you are late" to "nobody could have ended
+    your window early".
+    """
     claim_id, _ = adjudicated
-    deployed.advance_clock(4 * 24 * 60 * 60)
+
+    # Even well past the nominal window, the right to challenge survives
+    # while the claim is still ADJUDICATED.
+    at_time(direct_vm, BASE_TS + 9 * 24 * 60 * 60)
     direct_vm.sender = direct_charlie
-    with direct_vm.expect_revert("challenge window closed"):
+    deployed.submit_challenge(claim_id, "A later audit disputes this.", "[]")
+    assert deployed.get_claim(claim_id)["status"] == "CHALLENGED"
+
+
+def test_challenge_refused_once_finalized(direct_vm, deployed, direct_alice,
+                                          direct_charlie, adjudicated):
+    """Finalization is the real boundary, and it is consensus-gated."""
+    claim_id, _ = adjudicated
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
+    direct_vm.sender = direct_alice
+    deployed.finalize_claim(claim_id)
+
+    direct_vm.sender = direct_charlie
+    with direct_vm.expect_revert("illegal transition from FINALIZED"):
         deployed.submit_challenge(claim_id, "Too late.", "[]")
 
 
@@ -175,7 +202,7 @@ def test_finalization_blocked_inside_the_challenge_window(
 def test_finalization_mints_an_attestation(direct_vm, deployed, direct_alice,
                                            adjudicated):
     claim_id, adj_id = adjudicated
-    deployed.advance_clock(4 * 24 * 60 * 60)
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
     direct_vm.sender = direct_alice
     att_id = deployed.finalize_claim(claim_id)
 
@@ -195,7 +222,7 @@ def test_finalization_is_not_repeatable(direct_vm, deployed, direct_alice,
                                         adjudicated):
     """§43 — no double finalization, no post-finalization mutation."""
     claim_id, _ = adjudicated
-    deployed.advance_clock(4 * 24 * 60 * 60)
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
     direct_vm.sender = direct_alice
     deployed.finalize_claim(claim_id)
 
@@ -210,7 +237,7 @@ def test_finalization_is_not_repeatable(direct_vm, deployed, direct_alice,
 def test_attestation_verifies_against_live_state(direct_vm, deployed,
                                                  direct_alice, adjudicated):
     claim_id, _ = adjudicated
-    deployed.advance_clock(4 * 24 * 60 * 60)
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
     direct_vm.sender = direct_alice
     att_id = deployed.finalize_claim(claim_id)
 
@@ -231,7 +258,7 @@ def test_unknown_attestation_is_invalid_not_an_error(deployed):
 def test_agent_read_surface(direct_vm, deployed, direct_alice, adjudicated):
     """§30, §57 — what another agent consumes."""
     claim_id, _ = adjudicated
-    deployed.advance_clock(4 * 24 * 60 * 60)
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
     direct_vm.sender = direct_alice
     att_id = deployed.finalize_claim(claim_id)
 
@@ -272,7 +299,7 @@ def test_full_golden_path(direct_vm, deployed, direct_alice, direct_bob,
                 verdict="PARTIALLY_SUPPORTED", supporting=v2[:2],
                 partially=v2[2:])
 
-    deployed.advance_clock(4 * 24 * 60 * 60)
+    at_time(direct_vm, BASE_TS + 4 * 24 * 60 * 60)
     att_id = deployed.finalize_claim(opened)
 
     final = deployed.verify_attestation(att_id)

@@ -67,12 +67,54 @@ state stays a real, observable thing rather than a UI fiction.
 
 ## Protocol time
 
-Deadlines are absolute values on a monotonic clock measured in seconds.
-`advance_clock(seconds)` moves it forward, and is public, unprivileged
-and one-way.
+**Deadlines are real UTC seconds, observed through consensus.**
 
-This is not what §12 asks for first. §12 wants UTC seconds from a
-deterministic transaction timestamp — but the pinned runner has none:
+### Why the old design was unsafe
+
+Attestia previously kept a single `protocol_clock` counter and exposed a
+public, unprivileged `advance_clock`. That put a trust boundary in the
+wrong place twice over:
+
+* **directly** — Bob could advance the clock past Alice's evidence or
+  challenge deadline and expire a case he had nothing to do with;
+* **incidentally** — every write ticked the same counter, so ordinary
+  activity on one claim aged every other claim in the contract.
+
+A deadline that any caller can bring forward is not a deadline, and a
+protocol where one user's transaction shortens another user's window has
+no lifecycle guarantees at all.
+
+### What replaced it
+
+There is no global clock and no way to set one. `_observe_time()` runs a
+non-deterministic round: the leader reads a public time source, **every
+validator reads it independently**, and the round only lands if the
+readings agree within `CLOCK_TOLERANCE` (300s). Readings outside a sane
+range (`CLOCK_FLOOR`..`CLOCK_CEIL`) are refused outright.
+
+A caller can ask the network what time it is. No caller can tell the
+network what time it is.
+
+Time is consulted at exactly three points, and nowhere else:
+
+| Where | Why |
+|---|---|
+| `open_claim` | anchors `opened_at` and the evidence deadline — creator-only, so nobody else starts or shortens your window |
+| `adjudicate` | dates the verdict, which sets the challenge deadline |
+| `finalize_claim`, `force_close_evidence` | the two actions that can end someone else's window, so both must prove the deadline passed |
+
+Submitting evidence and filing a challenge read no clock at all. The
+evidence window bounds how long the record stays open, enforced at close;
+a challenge is admissible until the claim finalizes, and finalization is
+itself consensus-gated — so a challenger cannot be shut out early.
+
+`created_seq` and `updated_seq` are ordering, not time, and are named so
+they cannot be mistaken for timestamps.
+
+### Why not the runner's own timestamp
+
+§12 wants UTC seconds from a deterministic transaction timestamp — but
+the pinned runner has none:
 `gl.vm.get_timestamp()` is documented for v0.3.0 and absent from the std
 lib this runner bundles, and `gl.message` carries only
 `contract_address`, `sender_address`, `origin_address`, `value` and

@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import { useClaims } from "@/lib/hooks/useAttestia";
-import { protocolTime } from "@/lib/utils";
+import { seq } from "@/lib/utils";
 import {
   Card, CardHead, Empty, LinkButton, StatusPill, VerdictStamp,
 } from "@/components/ui";
@@ -146,7 +146,7 @@ export default function ClaimsPage() {
                           {claim.evidence_count} evidence · {claim.challenge_count} challenges
                         </span>
                         <span className="font-mono text-[10px] text-paper-faint">
-                          filed {protocolTime(claim.created_at)}
+                          filed {seq(claim.created_seq)}
                         </span>
                       </div>
                     </div>
