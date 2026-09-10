@@ -1,10 +1,12 @@
 """Shared fixtures for the Attestia direct suite (§48).
 
-Direct mode runs the contract in a real GenVM runner but exercises the
-LEADER path only: `mock_llm` answers the leader and every validator with
-the same canned response, so no direct test can demonstrate that
-independent nodes AGREE. That is the integration suite's job (§49), and
-nothing here claims otherwise.
+Direct mode runs the contract in a real GenVM runner. A contract call runs
+the LEADER closure; the validator closure is captured, and
+`test_validators.py` replays it with `direct_vm.run_validator()` after
+swapping mocks, to stage validators that read different bytes, judge
+differently, or see a different clock. What no direct test shows is a real
+network's validators agreeing — that is the integration suite's job (§49)
+and `scripts/prove_lifecycle.py`'s, and nothing here claims otherwise.
 
 What direct mode does prove is everything deterministic: state machine
 guards, permissions, bounds, identity minting, versioning, structured

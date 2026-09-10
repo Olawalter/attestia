@@ -74,10 +74,12 @@ caller cannot accidentally swallow the negative.
 ## Reading it from code
 
 ```python
+from eth_account import Account
 from genlayer_py import create_client
 from genlayer_py.chains import studionet
 
-client = create_client(chain=studionet)
+# genlayer_py wants an account even for reads; a throwaway one signs nothing.
+client = create_client(chain=studionet, account=Account.create())
 ATTESTIA = "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9"
 
 def settled(claim_id: str):

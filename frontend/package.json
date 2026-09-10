@@ -8,9 +8,10 @@
     "build": "next build",
     "start": "next start -p 3150",
     "typecheck": "tsc --noEmit",
-    "test:wallet": "node --test --experimental-strip-types tests/wallet-provider.test.ts",
-    "test:compat": "node --test --experimental-strip-types tests/compat.test.ts",
-    "test": "node --test --experimental-strip-types tests/wallet-provider.test.ts tests/compat.test.ts"
+    "test:wallet": "node --import ./tests/resolve-ts.mjs --test --experimental-strip-types tests/wallet-provider.test.ts",
+    "test:compat": "node --import ./tests/resolve-ts.mjs --test --experimental-strip-types tests/compat.test.ts",
+    "test": "node --import ./tests/resolve-ts.mjs --test --experimental-strip-types tests/wallet-provider.test.ts tests/compat.test.ts tests/config.test.ts",
+    "test:config": "node --import ./tests/resolve-ts.mjs --test --experimental-strip-types tests/config.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

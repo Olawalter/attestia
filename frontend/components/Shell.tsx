@@ -10,7 +10,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { getContractAddress, hasContract } from "@/lib/genlayer/client";
+import { getContractAddress, hasContract, productionConfig } from "@/lib/genlayer/client";
+import { useWallet } from "@/lib/genlayer/wallet";
 import { useDeploymentCheck } from "@/lib/hooks/useAttestia";
 import { describe } from "@/lib/contracts/compat";
 import { cn } from "@/lib/utils";
@@ -82,13 +83,62 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-6xl px-5 py-10">{children}</main>
 
       <footer className="mt-16 border-t border-rule">
-        <div className="mx-auto max-w-6xl px-5 py-6">
+        <div className="mx-auto max-w-6xl space-y-3 px-5 py-6">
           <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-paper-faint">
             DETERMINISTIC CODE GOVERNS THE CASE. GENLAYER GOVERNS THE JUDGMENT.
           </p>
+          <DeploymentReadout />
         </div>
       </footer>
     </div>
+  );
+}
+
+/**
+ * What this page is actually wired to (steward §7, §22).
+ *
+ * Every value comes from `productionConfig()` and the connected wallet —
+ * the same values the read and write clients use — so a reader of the
+ * live site can check the deployment without opening dev tools: one
+ * contract for reads and writes, the chain, the RPC, and which wallet
+ * would sign, on which chain it currently sits.
+ */
+function DeploymentReadout() {
+  const cfg = productionConfig();
+  const { selected, address, chainId } = useWallet();
+  if (!cfg.contractAddress) return null;
+
+  const walletChain = chainId ? Number.parseInt(chainId, 16) : null;
+  const onChain = walletChain === cfg.chainId;
+  let rpcHost = cfg.rpc;
+  try {
+    rpcHost = new URL(cfg.rpc).host;
+  } catch {
+    // an unparseable override is shown as configured
+  }
+
+  return (
+    <dl className="grid gap-x-6 gap-y-1 font-mono text-[10px] leading-relaxed text-paper-faint
+                   sm:grid-cols-[auto_1fr]">
+      <dt>READS + WRITES</dt>
+      <dd className="break-all text-paper-muted" data-testid="contract-address">
+        {cfg.contractAddress}
+      </dd>
+      <dt>NETWORK</dt>
+      <dd>{cfg.network} · chain {cfg.chainId} · {rpcHost}</dd>
+      {selected && address && (
+        <>
+          <dt>SIGNER</dt>
+          <dd className="break-all">
+            {selected.info.name} · {address} ·{" "}
+            <span className={onChain ? "text-paper-muted" : "text-[#e0a49b]"}>
+              wallet on chain {walletChain ?? "unknown"}
+              {onChain ? "" : ` — expected ${cfg.chainId}`}
+            </span>
+          </dd>
+        </>
+      )}
+    </dl>
   );
 }
 

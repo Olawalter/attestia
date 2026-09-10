@@ -2,6 +2,7 @@
 
     genlayer code <address> > onchain.py
     python scripts/verify_deployment.py onchain.py
+    python scripts/verify_deployment.py onchain.py --source <other revision>
 
 A README that names an address is a claim; this is what turns it into a
 check anyone can repeat. The comparison normalises three things and
@@ -36,13 +37,21 @@ def canonical(text: str) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    # Optional `--source <file>` compares against another revision instead
+    # of the working tree, e.g. `git show <commit>:contracts/attestia.py`.
+    args = sys.argv[1:]
+    source_path = None
+    if len(args) == 3 and args[1] == "--source":
+        source_path = pathlib.Path(args[2])
+        args = args[:1]
+    if len(args) != 1:
         print(__doc__)
         return 2
 
     root = pathlib.Path(__file__).resolve().parents[1]
-    source = canonical((root / "contracts" / "attestia.py").read_text(encoding="utf-8"))
-    onchain = canonical(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+    source_path = source_path or root / "contracts" / "attestia.py"
+    source = canonical(source_path.read_text(encoding="utf-8"))
+    onchain = canonical(pathlib.Path(args[0]).read_text(encoding="utf-8"))
 
     digest = hashlib.sha256(source.encode()).hexdigest()
     if source == onchain:

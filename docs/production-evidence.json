@@ -1,0 +1,755 @@
+{
+  "generated_at": "2026-09-10T20:20:59+00:00",
+  "started_at": "2026-09-10T20:10:40+00:00",
+  "production_contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+  "network": "GenLayer StudioNet",
+  "chain_id": 61999,
+  "rpc": "https://studio.genlayer.com/api",
+  "contract_version": "Attestia-1.0.0",
+  "signer": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+  "claim_id": "claim_000001",
+  "evidence_sources": {
+    "evidence": "https://raw.githubusercontent.com/genlayerlabs/genlayer-project-boilerplate/e685f1f12c4c357787d48390692a654baf576f03/README.md",
+    "counter": "https://raw.githubusercontent.com/genlayerlabs/genlayer-project-boilerplate/e685f1f12c4c357787d48390692a654baf576f03/LICENSE"
+  },
+  "steps": [
+    {
+      "step": "CREATE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "create_claim",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "The GenLayer project boilerplate repository documents a GenLayer intelligent contract project.",
+        60,
+        120
+      ],
+      "submitted_at": "2026-09-10T20:10:43+00:00",
+      "tx_hash": "0x7ca5b5b50a0fef1a6150ef557cc2425f2f6f3f18ff6a7b683703488909b7cbae",
+      "accepted": {
+        "at": "2026-09-10T20:11:03+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            100,
+            99,
+            108,
+            97,
+            105,
+            109,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49
+          ],
+          "readable": "\"claim_000001\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x7ca5b5b50a0fef1a6150ef557cc2425f2f6f3f18ff6a7b683703488909b7cbae"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:11:32+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "DRAFT",
+        "current_version": 1,
+        "current_verdict": "",
+        "evidence_count": 0,
+        "challenge_count": 0,
+        "adjudication_count": 0,
+        "opened_at": 0,
+        "evidence_deadline": 0,
+        "adjudicated_at": 0,
+        "challenge_deadline": 0,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "OPEN",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "open_claim",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:11:36+00:00",
+      "tx_hash": "0x63fde8d327a620ad0701b0eb6f3f805b5aa1b48c88ebf085b81fd0a7f7597e02",
+      "accepted": {
+        "at": "2026-09-10T20:11:51+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            129,
+            240,
+            225,
+            168,
+            53
+          ],
+          "readable": "1789071104"
+        },
+        "validator_votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x63fde8d327a620ad0701b0eb6f3f805b5aa1b48c88ebf085b81fd0a7f7597e02"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:12:18+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "OPEN",
+        "current_version": 1,
+        "current_verdict": "",
+        "evidence_count": 0,
+        "challenge_count": 0,
+        "adjudication_count": 0,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 0,
+        "challenge_deadline": 0,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "EVIDENCE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "submit_evidence",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001",
+        "https://raw.githubusercontent.com/genlayerlabs/genlayer-project-boilerplate/e685f1f12c4c357787d48390692a654baf576f03/README.md",
+        "DOCUMENTATION",
+        "The repository README, pinned to a commit.",
+        "SUPPORTS"
+      ],
+      "submitted_at": "2026-09-10T20:12:20+00:00",
+      "tx_hash": "0x1262a01bb32d3b2b5288e075d2d7a9f69491533976314c9b1c4e27b7a86a2229",
+      "accepted": {
+        "at": "2026-09-10T20:12:36+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            76,
+            101,
+            118,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49
+          ],
+          "readable": "\"ev_000001\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x1262a01bb32d3b2b5288e075d2d7a9f69491533976314c9b1c4e27b7a86a2229"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:13:05+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "OPEN",
+        "current_version": 1,
+        "current_verdict": "",
+        "evidence_count": 1,
+        "challenge_count": 0,
+        "adjudication_count": 0,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 0,
+        "challenge_deadline": 0,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "CLOSE_EVIDENCE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "close_evidence",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:13:08+00:00",
+      "tx_hash": "0x13c5638d1c13722d8986381fef30d53e03faea544237b9c6da039c14c78fc8d9",
+      "accepted": {
+        "at": "2026-09-10T20:13:23+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            108,
+            91,
+            34,
+            101,
+            118,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49,
+            34,
+            93
+          ],
+          "readable": "\"[\\\"ev_000001\\\"]\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x13c5638d1c13722d8986381fef30d53e03faea544237b9c6da039c14c78fc8d9"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:13:48+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "EVIDENCE_CLOSED",
+        "current_version": 1,
+        "current_verdict": "",
+        "evidence_count": 1,
+        "challenge_count": 0,
+        "adjudication_count": 0,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 0,
+        "challenge_deadline": 0,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "START_ADJUDICATION",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "start_adjudication",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:13:51+00:00",
+      "tx_hash": "0x6ef651bfa84c44e1bc6c2038499cde53188386d237df659e71640431f0f9ead3",
+      "accepted": {
+        "at": "2026-09-10T20:14:07+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            100,
+            65,
+            68,
+            74,
+            85,
+            68,
+            73,
+            67,
+            65,
+            84,
+            73,
+            78,
+            71
+          ],
+          "readable": "\"ADJUDICATING\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE"
+        ],
+        "gl_tx_id": "0x6ef651bfa84c44e1bc6c2038499cde53188386d237df659e71640431f0f9ead3"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:14:36+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "ADJUDICATING",
+        "current_version": 1,
+        "current_verdict": "",
+        "evidence_count": 1,
+        "challenge_count": 0,
+        "adjudication_count": 0,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 0,
+        "challenge_deadline": 0,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "ADJUDICATE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "adjudicate",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:14:39+00:00",
+      "tx_hash": "0x01b0c653975c367ff57c0ca5619c44bb0c72811b1fd329b76a548c38d5c61c9e",
+      "accepted": {
+        "at": "2026-09-10T20:15:07+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            84,
+            97,
+            100,
+            106,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49
+          ],
+          "readable": "\"adj_000001\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "AGREE",
+          "IDLE"
+        ],
+        "gl_tx_id": "0x01b0c653975c367ff57c0ca5619c44bb0c72811b1fd329b76a548c38d5c61c9e"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:15:41+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "ADJUDICATED",
+        "current_version": 1,
+        "current_verdict": "SUPPORTED",
+        "evidence_count": 1,
+        "challenge_count": 0,
+        "adjudication_count": 1,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071296,
+        "challenge_deadline": 1789071416,
+        "finalized_at": 0,
+        "current_adjudication_id": "adj_000001",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "CHALLENGE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "submit_challenge",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001",
+        "The README alone does not settle the claim; a second file from the same commit should be weighed.",
+        "[{\"source_url\": \"https://raw.githubusercontent.com/genlayerlabs/genlayer-project-boilerplate/e685f1f12c4c357787d48390692a654baf576f03/LICENSE\", \"source_type\": \"REPOSITORY_FILE\", \"description\": \"The repository LICENSE at the same commit.\"}]"
+      ],
+      "submitted_at": "2026-09-10T20:15:44+00:00",
+      "tx_hash": "0x25378b9d8d580e8a5884762b92477ab60efc467b7c1e00b4027fdc1f9fd83771",
+      "accepted": {
+        "at": "2026-09-10T20:15:56+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            92,
+            99,
+            104,
+            97,
+            108,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49
+          ],
+          "readable": "\"chal_000001\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x25378b9d8d580e8a5884762b92477ab60efc467b7c1e00b4027fdc1f9fd83771"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:16:27+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "CHALLENGED",
+        "current_version": 2,
+        "current_verdict": "",
+        "evidence_count": 2,
+        "challenge_count": 1,
+        "adjudication_count": 1,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071296,
+        "challenge_deadline": 1789071416,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "START_RE_ADJUDICATION",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "start_adjudication",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:16:28+00:00",
+      "tx_hash": "0x657cd1ea8e90b2fe0c4b2ed158f96bcc5b8c43888f54f3056f2f6ce7b29ec465",
+      "accepted": {
+        "at": "2026-09-10T20:16:44+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            124,
+            82,
+            69,
+            95,
+            65,
+            68,
+            74,
+            85,
+            68,
+            73,
+            67,
+            65,
+            84,
+            73,
+            78,
+            71
+          ],
+          "readable": "\"RE_ADJUDICATING\""
+        },
+        "validator_votes": [
+          "IDLE",
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x657cd1ea8e90b2fe0c4b2ed158f96bcc5b8c43888f54f3056f2f6ce7b29ec465"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:17:17+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "RE_ADJUDICATING",
+        "current_version": 2,
+        "current_verdict": "",
+        "evidence_count": 2,
+        "challenge_count": 1,
+        "adjudication_count": 1,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071296,
+        "challenge_deadline": 1789071416,
+        "finalized_at": 0,
+        "current_adjudication_id": "",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "RE_ADJUDICATE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "adjudicate",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:17:19+00:00",
+      "tx_hash": "0xd7c8b57a9a3c0f2cef11cb9ae8db4fd58c059fefabd28ff626761d716edcda54",
+      "accepted": {
+        "at": "2026-09-10T20:17:45+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            84,
+            97,
+            100,
+            106,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            50
+          ],
+          "readable": "\"adj_000002\""
+        },
+        "validator_votes": [
+          "IDLE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "IDLE"
+        ],
+        "gl_tx_id": "0xd7c8b57a9a3c0f2cef11cb9ae8db4fd58c059fefabd28ff626761d716edcda54"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:18:18+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "ADJUDICATED",
+        "current_version": 2,
+        "current_verdict": "SUPPORTED",
+        "evidence_count": 2,
+        "challenge_count": 1,
+        "adjudication_count": 2,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071454,
+        "challenge_deadline": 1789071574,
+        "finalized_at": 0,
+        "current_adjudication_id": "adj_000002",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "FINALIZE_EARLY_REFUSED",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "finalize_claim",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:18:22+00:00",
+      "tx_hash": "0x9e14d02a323842769e239f80c7700c82174a3e172e04027ee8e7a88b621b9841",
+      "accepted": {
+        "at": "2026-09-10T20:18:38+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "ERROR",
+        "result_status": "rollback",
+        "payload": "EXPECTED: challenge window is open until 1789071574; consensus reads 1789071515",
+        "validator_votes": [
+          "IDLE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "IDLE"
+        ],
+        "gl_tx_id": "0x9e14d02a323842769e239f80c7700c82174a3e172e04027ee8e7a88b621b9841"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:19:13+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": false,
+      "refreshed_state": {
+        "status": "ADJUDICATED",
+        "current_version": 2,
+        "current_verdict": "SUPPORTED",
+        "evidence_count": 2,
+        "challenge_count": 1,
+        "adjudication_count": 2,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071454,
+        "challenge_deadline": 1789071574,
+        "finalized_at": 0,
+        "current_adjudication_id": "adj_000002",
+        "current_attestation_id": ""
+      }
+    },
+    {
+      "step": "FINALIZE",
+      "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+      "function": "finalize_claim",
+      "caller": "0x9Ce1606755EB485215BaB0f4D8ab73Bd6CA85f49",
+      "args": [
+        "claim_000001"
+      ],
+      "submitted_at": "2026-09-10T20:19:54+00:00",
+      "tx_hash": "0x32ff4b78685840eb3d16a59756a8778f3714ef2f901e4551560edb604336a278",
+      "accepted": {
+        "at": "2026-09-10T20:20:10+00:00",
+        "status_name": "ACCEPTED",
+        "consensus_result": "MAJORITY_AGREE",
+        "execution_result": "SUCCESS",
+        "result_status": "return",
+        "payload": {
+          "raw": [
+            84,
+            97,
+            116,
+            116,
+            95,
+            48,
+            48,
+            48,
+            48,
+            48,
+            49
+          ],
+          "readable": "\"att_000001\""
+        },
+        "validator_votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE",
+          "AGREE"
+        ],
+        "gl_tx_id": "0x32ff4b78685840eb3d16a59756a8778f3714ef2f901e4551560edb604336a278"
+      },
+      "finalized": {
+        "at": "2026-09-10T20:20:39+00:00",
+        "status_name": "FINALIZED"
+      },
+      "execution_succeeded": true,
+      "refreshed_state": {
+        "status": "FINALIZED",
+        "current_version": 2,
+        "current_verdict": "SUPPORTED",
+        "evidence_count": 2,
+        "challenge_count": 1,
+        "adjudication_count": 2,
+        "opened_at": 1789071104,
+        "evidence_deadline": 1789071164,
+        "adjudicated_at": 1789071454,
+        "challenge_deadline": 1789071574,
+        "finalized_at": 1789071604,
+        "current_adjudication_id": "adj_000002",
+        "current_attestation_id": "att_000001"
+      }
+    }
+  ],
+  "attestation": {
+    "adjudicated_at": 1789071454,
+    "adjudication_id": "adj_000002",
+    "attestation_id": "att_000001",
+    "challenge_count": 1,
+    "claim_created_seq": 1,
+    "claim_id": "claim_000001",
+    "claim_text": "The GenLayer project boilerplate repository documents a GenLayer intelligent contract project.",
+    "claim_version": 2,
+    "content_binding_hash": "8c693c2d19fc55cd958dc3bc9c656475396015119dd3a2da84a6db7331dd3bed",
+    "contract": "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9",
+    "evidence_count": 2,
+    "evidence_snapshot_hash": "6e434e93dc369c914b4a8944d2f44793c425815c02719e32c4a62e7a5109aedc",
+    "finalized_at": 1789071604,
+    "verdict": "SUPPORTED"
+  },
+  "verification": {
+    "adjudication_id": "adj_000002",
+    "attestation_id": "att_000001",
+    "challenge_count": 1,
+    "claim_id": "claim_000001",
+    "claim_version": 2,
+    "content_binding_hash": "8c693c2d19fc55cd958dc3bc9c656475396015119dd3a2da84a6db7331dd3bed",
+    "evidence_count": 2,
+    "evidence_snapshot_hash": "6e434e93dc369c914b4a8944d2f44793c425815c02719e32c4a62e7a5109aedc",
+    "finalized": true,
+    "reason": "verified against protocol state",
+    "valid": true,
+    "verdict": "SUPPORTED"
+  },
+  "content_bindings": [
+    {
+      "digest": "52052ae03afbdeb2decc59db8aed2ddbb5797d06d417b1f4f5d0eabe8952faa6",
+      "evidence_id": "ev_000002",
+      "retrieval": "SOURCE_OK"
+    },
+    {
+      "digest": "0300b16b695805c9380ca2080396ea75334fff3bc4f7ae0a24ca909038efe637",
+      "evidence_id": "ev_000003",
+      "retrieval": "SOURCE_OK"
+    }
+  ],
+  "content_binding_hash": "8c693c2d19fc55cd958dc3bc9c656475396015119dd3a2da84a6db7331dd3bed",
+  "history": [
+    {
+      "claim_version": 1,
+      "verdict": "SUPPORTED",
+      "adjudication_id": "adj_000001",
+      "superseded": true
+    },
+    {
+      "claim_version": 2,
+      "verdict": "SUPPORTED",
+      "adjudication_id": "adj_000002",
+      "superseded": false
+    }
+  ]
+}

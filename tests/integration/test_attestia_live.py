@@ -36,10 +36,12 @@ CLAIM_TEXT = ("The GenLayer project boilerplate repository documents a "
 
 # Commit-pinned raw content: every validator must retrieve the SAME bytes.
 # A URL whose content moves between fetches is a consensus hazard, not a
-# test.
+# test — and more so now that retrieved-content digests sit inside the
+# consensus fingerprint. (This previously said "commit-pinned" while
+# pointing at `main`; it is genuinely pinned now.)
 GOOD_URL = (
     "https://raw.githubusercontent.com/genlayerlabs/genlayer-project-boilerplate/"
-    "main/README.md"
+    "e685f1f12c4c357787d48390692a654baf576f03/README.md"
 )
 # Deliberately unresolvable — proves unavailable != contradicting (§45).
 DEAD_URL = "https://attestia-source-does-not-exist.invalid/post-mortem.json"

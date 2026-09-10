@@ -5,7 +5,7 @@
 | Tool | Version | Why |
 |---|---|---|
 | Python | 3.12 | the direct-test harness targets it |
-| Node | 20+ | Next.js 16 |
+| Node | 22.6+ | Next.js 16 builds on 20+; `npm test` needs `--experimental-strip-types` |
 | GenLayer CLI | current | `npm i -g genlayer` |
 
 ```bash
@@ -47,6 +47,11 @@ npm install
 cp .env.example .env.local        # set NEXT_PUBLIC_CONTRACT_ADDRESS
 npm run dev                       # http://localhost:3150
 npm run typecheck && npm run build
+npm test                          # wallet, schema compatibility, config
+```
+
+```bash
+python scripts/check_docs.py      # the docs describe one deployment, on chain
 ```
 
 ## Deploying
@@ -80,15 +85,17 @@ check. It normalises three things and nothing else — CRLF line endings,
 the CLI's BOM and `Result:` banner, and trailing blank lines — then
 demands the rest match byte for byte, comments included.
 
-Then point the app at it:
+Then point the app at it — locally, and in the hosting environment:
 
 ```bash
-# frontend/.env.local
+# frontend/.env.local, and the Vercel project's Production environment
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x…
 ```
 
-Redeploying and forgetting this is the classic failure: the app keeps
-serving the old contract and every number on screen is quietly stale.
+`NEXT_PUBLIC_*` values are inlined at build time, so changing the Vercel
+variable does nothing until the project is **redeployed**. Redeploying the
+contract and forgetting this is the classic failure, and it is exactly
+what happened here — see below.
 
 ## Running the live suite
 
@@ -179,9 +186,95 @@ zero edges on a completely healthy graph.
 |---|---|
 | Network | GenLayer StudioNet, chain id 61999 |
 | Address | `0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9` |
-| Deploy tx | `0x10cac1daaafb7e7f6f1a818e4d361bbf84401cd2d903fe0cca916e4b27a41870` |
+| Deploy tx | `0x8c9eed482929d85c27fbaace153322ade457812c361a81578e18f76e5ae80d7e` |
 | Consensus | 5 validators, 5 AGREE |
 | Runner | `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6` |
-| Source sha256 | `370a8905896abf472e6ca6f794321533a410ce4f852519d79cc15fa9b4a6f6d6` |
+| Source sha256 | `4b3d78cadc9fafd704f0ee6cc535d580350a5ba939d3458d9d9d2dc2cde00899` |
 
 Byte-verified with `scripts/verify_deployment.py` against this source.
+`scripts/check_docs.py` re-checks, against chain, that this table, the
+README, the agent-integration example and `frontend/.env.example` all
+describe this one deployment.
+
+## Why production moved, and why it cannot move back
+
+Two Attestia contracts exist on StudioNet. Only one satisfies the
+protocol's security requirements, and deployed code cannot be changed, so
+the choice between them is not a configuration preference.
+
+| | `0x1685CC12…52D3` | `0x8d57088F…d1f9` |
+|---|---|---|
+| Code | byte-identical to commit `f6be234` (original build) | byte-identical to commit `fb328c3` (steward fix) |
+| Code sha256 | `370a8905…a6f6d6` | `4b3d78ca…c2cde00899` |
+| Methods | 23 | 24 |
+| `advance_clock` — anyone sets the global clock | **present** | absent |
+| Consensus-observed deadlines | no | yes |
+| `create_claim` parameters | `claim_text, evidence_window_seconds` | `+ challenge_window_seconds` |
+| Content-bound verdicts, `check_evidence_binding` | absent | present |
+
+Reproduce every row:
+
+```bash
+genlayer code 0x1685CC12792e2cd275eadc7FbCfa63A8317152D3 > old.py
+git show f6be234:contracts/attestia.py > f6be234.py
+python scripts/verify_deployment.py old.py --source f6be234.py
+genlayer schema 0x1685CC12792e2cd275eadc7FbCfa63A8317152D3
+```
+
+**What the production site was doing.** Its Vercel build still had
+`NEXT_PUBLIC_CONTRACT_ADDRESS=0x1685CC12…`, while its code was the
+post-fix frontend. Every read went to the pre-fix contract, and every
+`create_claim` sent three arguments to a method that takes two. GenVM
+raised a `TypeError` inside the contract, the transaction was accepted by
+the network and its execution failed, and the frontend reported the
+leader receipt's payload verbatim: `exit_code 1`.
+
+Reproduced on chain with the current frontend's call shape, against a
+throwaway deployment of the same bytes (`0xAc0d48F0…0dE5`, code sha256
+`370a8905…a6f6d6`, identical to `0x1685CC12`) so that nothing was written
+to the address under review. Transaction
+`0xf6c9388a58774cac36ac0dc3357a15453323e0f9ee44ba8608080835cd084161`:
+FINALIZED, MAJORITY_AGREE, leader execution `ERROR`, result payload
+`exit_code 1`, and the leader's stderr ends in
+`TypeError: Attestia.create_claim() takes from 2 to 3 positional arguments
+but 4 were given`. The validators agreed, correctly, that the call fails.
+
+It was not a wallet problem, a network or chain mismatch, a consensus
+failure or a web-access failure; it was one environment variable naming
+the wrong deployment, in a build that nothing checked against the chain.
+
+**What now prevents a repeat.**
+
+- `lib/contracts/compat.ts` reads the schema the chain reports for the
+  configured address and compares it with every call this build makes.
+  On a mismatch the app shows which methods are missing or take fewer
+  arguments, and **refuses to open the wallet** — the user is told in
+  words instead of signing a transaction that can only revert.
+  `tests/compat.test.ts` runs that comparison against the real schemas of
+  both addresses, captured from chain.
+- Every address, chain id and RPC in the app resolves through
+  `lib/genlayer/client.ts`; the chain id is read from the same chain
+  object the clients are built with. `tests/config.test.ts` checks the
+  requests that actually leave the app: reads and the signed write carry
+  the same contract, over the same RPC, from the selected wallet.
+- The footer of every page states the contract used for reads and
+  writes, the network, chain and RPC, and the connected signer with the
+  chain its wallet is on — checkable on the live site without dev tools.
+
+**Moving production.** In the Vercel project, set Production
+`NEXT_PUBLIC_CONTRACT_ADDRESS=0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9`,
+redeploy, then confirm on the live site that the footer shows that
+address and that no compatibility banner appears.
+
+## Production lifecycle
+
+`scripts/prove_lifecycle.py` drives one claim through the entire protocol
+against the production contract, recording for every write the
+transaction, the validators' decision, the execution result, finality,
+and the state read back afterwards. The record is
+[production-evidence.md](production-evidence.md); re-check it against the
+network with:
+
+```bash
+python scripts/prove_lifecycle.py --verify docs/production-evidence.json
+```

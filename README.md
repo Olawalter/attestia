@@ -153,7 +153,7 @@ anything fails to line up.
 pip install -r requirements.txt
 python scripts/fetch_genvm_bundle.py     # seeds the GenVM runner bundle
 genvm-lint check contracts/attestia.py
-pytest tests/direct/ -q                  # 71 tests, offline
+pytest tests/direct/ -q                  # 100 tests, offline
 ```
 
 ```bash
@@ -166,24 +166,38 @@ npm run dev                              # http://localhost:3150
 ## 10. Testing
 
 ```text
-genvm-lint check      passes — 23 methods (13 view, 10 write)
-pytest tests/direct   89 passed, offline
-gltest tests/integr.  7 passed on StudioNet, real panel  (11m09s)
-npm run test:wallet   5 passed — the selected wallet signs
-tsc --noEmit          clean
-next build            clean, 6 routes
+genvm-lint check          passes — 24 methods (14 view, 10 write)
+pytest tests/direct       100 passed, offline
+gltest tests/integr.      7 passed on StudioNet, real panel  (11m09s)
+npm test (frontend)       17 passed — wallet 6, schema compat 5, config 6
+tsc --noEmit              clean
+next build                clean, 6 routes
+scripts/check_docs.py     one deployment, confirmed on chain
+scripts/prove_lifecycle.py --verify   report matches chain
 ```
 
-The live suite is the one that proves consensus. Direct mode answers the
-leader and every validator with the same canned response, so it can never
-show that independent nodes agree — it proves the deterministic half:
-guards, bounds, versioning, and that a malformed or dishonest panel answer
-never becomes protocol state.
+Direct mode proves the deterministic half — guards, bounds, versioning,
+and that a malformed or dishonest panel answer never becomes protocol
+state — and, through `direct_vm.run_validator()`, the validator half: the
+contract's own validator closure is replayed against the leader's result
+with swapped mocks, and refuses a leader that read different bytes,
+reached a different determination, moved the clock, or forged its result
+(`tests/direct/test_validators.py`). What only the network can show is
+real, independent validators agreeing; that is the live suite and the
+production lifecycle in [docs/production-evidence.md](docs/production-evidence.md).
 
-The last live run walked the whole golden path on chain — claim, evidence,
-freeze, real panel round, verdict, challenge, second version,
-re-adjudication, finalization, attestation, verification — ending at
-`claim_000005 v1 → SUPPORTED → att_000001`.
+The production contract has walked the whole path on chain — claim,
+evidence, freeze, real panel round, verdict, challenge, second version,
+re-adjudication, an early finalize refused by the consensus clock, then
+finalization, attestation and verification — ending at
+`claim_000001 v2 → SUPPORTED → att_000001`. Every transaction, its
+decision and its finality are in
+[docs/production-evidence.md](docs/production-evidence.md), and anyone can
+re-check that record against the network:
+
+```bash
+python scripts/prove_lifecycle.py --verify docs/production-evidence.json
+```
 
 See [docs/](docs/) for the full architecture, and
 [docs/security.md](docs/security.md) for the threat model and the
@@ -193,7 +207,7 @@ assumptions this protocol does not hide.
 
 - Network: **GenLayer StudioNet** (chain id 61999)
 - Contract: `0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9`
-- Deploy tx: `0x10cac1daaafb7e7f6f1a818e4d361bbf84401cd2d903fe0cca916e4b27a41870`
+- Deploy tx: `0x8c9eed482929d85c27fbaace153322ade457812c361a81578e18f76e5ae80d7e`
 - Consensus on deploy: 5 validators, 5 AGREE
 - Runner: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
 - Source sha256: `4b3d78cadc9fafd704f0ee6cc535d580350a5ba939d3458d9d9d2dc2cde00899`
@@ -204,7 +218,7 @@ ships with the repository:
 ```bash
 genlayer code 0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9 > onchain.py
 python scripts/verify_deployment.py onchain.py
-# MATCH   sha256 370a8905896abf472e6ca6f794321533a410ce4f852519d79cc15fa9b4a6f6d6
+# MATCH   sha256 4b3d78cadc9fafd704f0ee6cc535d580350a5ba939d3458d9d9d2dc2cde00899
 ```
 
 That comparison was run against this deployment and matched.

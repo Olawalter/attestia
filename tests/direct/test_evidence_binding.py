@@ -10,13 +10,12 @@ retrieved, carried in the decision fingerprint. Two consequences follow,
 and this file tests both: the verdict names the content it rests on, and
 validators that read different bytes cannot agree at all.
 
-On what direct mode can show: `mock_llm` answers the leader and every
-validator with one canned response, so a validator DISAGREEMENT cannot be
-staged here. What can be shown is the mechanism the disagreement rests
-on — that the digest is taken from what was fetched, that different
-content yields a different digest, and that the contract refuses to bind
-anything it could not read. Real divergence is the integration suite's
-job, and it is not claimed here.
+This file tests the binding as the leader records it — that the digest is
+taken from what was fetched, that different content yields a different
+digest, and that the contract refuses to bind anything it could not read.
+The disagreement itself — a validator that read different bytes refusing
+the leader's result — is staged in `test_validators.py`, which replays the
+contract's validator closure with swapped mocks.
 """
 import hashlib
 import re
@@ -166,10 +165,10 @@ def test_the_binding_is_what_validators_compare(
 ):
     """§19.3, §19.4 — leader/source mismatch is caught by the fingerprint.
 
-    Direct mode cannot stage a divergent validator, so this proves the
-    input to that comparison rather than claiming the comparison itself:
-    an identical VERDICT over different CONTENT yields a different
-    binding hash. Since the binding is part of the decision fingerprint,
+    This proves the input to that comparison: an identical VERDICT over
+    different CONTENT yields a different binding hash. The comparison
+    itself is exercised in `test_validators.py`
+    (`test_panel_validator_rejects_a_leader_that_read_different_bytes`). Since the binding is part of the decision fingerprint,
     a leader that reached the right-looking answer over the wrong document
     cannot match a validator that read the right one.
     """

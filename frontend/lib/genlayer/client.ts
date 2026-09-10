@@ -12,14 +12,22 @@ import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import type { Eip1193Provider } from "./wallet";
 
-export const CHAIN_ID = Number(
-  process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID || "61999",
-);
+/**
+ * ONE network definition, and every consumer derives from it.
+ *
+ * The chain id used to come from its own env var while the clients were
+ * built with `studionet` — so a wallet could be switched to one chain and
+ * the transaction built for another, with nothing noticing. The id and
+ * name are now read off the same chain object the clients are built with,
+ * and the RPC is one value shared by the clients and the wallet's
+ * add-network request. `tests/config.test.ts` holds all of them equal.
+ */
+export const CHAIN = studionet;
+export const CHAIN_ID = CHAIN.id;
 export const CHAIN_ID_HEX = `0x${CHAIN_ID.toString(16)}`;
-export const CHAIN_NAME =
-  process.env.NEXT_PUBLIC_GENLAYER_CHAIN_NAME || "GenLayer Studio";
+export const CHAIN_NAME = CHAIN.name;
 export const RPC_URL =
-  process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api";
+  process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || CHAIN.rpcUrls.default.http[0];
 
 /** For `wallet_addEthereumChain` when the wallet does not know the chain. */
 export const NETWORK_PARAMS = {
@@ -43,9 +51,29 @@ export function hasContract(): boolean {
   return Boolean(getContractAddress());
 }
 
+/**
+ * The production configuration, in one place (steward §6).
+ *
+ * Reads, writes, the schema check, transaction tracking and the footer
+ * readout all resolve through this module; nothing else in the app holds
+ * an address, a chain id or an RPC. The ABI is not a file this build
+ * ships: it is the schema the chain reports for `contractAddress`
+ * (`gen_getContractSchema`), compared against the calls this build makes
+ * by `lib/contracts/compat.ts` before anything is signed.
+ */
+export function productionConfig() {
+  return {
+    contractAddress: getContractAddress(),
+    chainId: CHAIN_ID,
+    network: CHAIN_NAME,
+    rpc: RPC_URL,
+    abi: "gen_getContractSchema(contractAddress), checked by lib/contracts/compat.ts",
+  } as const;
+}
+
 /** A read-only client. No account, so it can never sign anything. */
 export function readClient() {
-  return createClient({ chain: studionet, endpoint: RPC_URL });
+  return createClient({ chain: CHAIN, endpoint: RPC_URL });
 }
 
 /**
@@ -78,7 +106,7 @@ export function writeClient(account: string, provider: Eip1193Provider) {
     );
   }
   return createClient({
-    chain: studionet,
+    chain: CHAIN,
     endpoint: RPC_URL,
     account: account as `0x${string}`,
     // Structural pass-through: genlayer-js types this as its internal
