@@ -11,7 +11,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import * as api from "../contracts/attestia";
-import { hasContract } from "../genlayer/client";
+import { getContractAddress, hasContract } from "../genlayer/client";
+import { compareSchema, describe } from "../contracts/compat";
 import type { TxPhase } from "../contracts/types";
 import { useWallet } from "../genlayer/wallet";
 import { useCallback, useState } from "react";
@@ -155,6 +156,30 @@ export function useRelatedCases(claimId: string, run: boolean) {
   });
 }
 
+/**
+ * Does the configured deployment accept what this build will send?
+ *
+ * Cached for the session: a deployed contract's schema cannot change, so
+ * one read answers the question for as long as the page is open.
+ */
+export function useDeploymentCheck() {
+  return useQuery({
+    queryKey: ["deployment-check", getContractAddressSafe()] as const,
+    enabled: enabled(),
+    staleTime: Infinity,
+    retry: 2,
+    queryFn: async () => compareSchema(await api.getDeployedSchema()),
+  });
+}
+
+function getContractAddressSafe(): string {
+  try {
+    return getContractAddress();
+  } catch {
+    return "";
+  }
+}
+
 /** What the UI needs to narrate a write truthfully (§34). */
 export interface TxState {
   phase: TxPhase;
@@ -174,6 +199,7 @@ const IDLE: TxState = { phase: "idle", hash: "", message: "" };
 export function useContractWrite() {
   const { address, selected, status } = useWallet();
   const queryClient = useQueryClient();
+  const { data: compat } = useDeploymentCheck();
   const [tx, setTx] = useState<TxState>(IDLE);
 
   const reset = useCallback(() => setTx(IDLE), []);
@@ -186,6 +212,13 @@ export function useContractWrite() {
       if (!address || !selected) throw new Error("Connect a wallet first.");
       if (status === "wrong-network") {
         throw new Error("Switch to the GenLayer network before signing.");
+      }
+      // Refuse BEFORE the signature, in words, rather than let the user
+      // sign a transaction that can only come back as `exit_code 1`.
+      if (compat && !compat.compatible) {
+        throw new Error(
+          `The configured contract cannot accept this app's calls (${describe(compat)}). `
+          + "Writes are disabled until the deployment and the frontend match.");
       }
       setTx({ phase: "signing", hash: "", message: "" });
 

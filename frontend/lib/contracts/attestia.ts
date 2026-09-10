@@ -12,6 +12,7 @@ import type { CalldataEncodable, TransactionHash } from "genlayer-js/types";
 
 import { getContractAddress, readClient, writeClient } from "../genlayer/client";
 import type { Eip1193Provider } from "../genlayer/wallet";
+import type { ContractSchema } from "./compat";
 import type {
   Adjudication, Attestation, AttestationCheck, BindingCheck, Challenge, Claim, ClaimHistory,
   ClaimPage, ClaimVerdict, Evidence, ProtocolInfo, TxPhase,
@@ -77,6 +78,18 @@ export const getClaimVerdict = (claimId: string) =>
   read<ClaimVerdict>("get_claim_verdict", [claimId]);
 export const getClaimHistory = (claimId: string) =>
   read<ClaimHistory>("get_claim_history", [claimId]);
+/**
+ * The schema the CHAIN reports for the configured address — not the one
+ * this build was written against. `getContractSchema` is genlayer-js's
+ * own call; on Studio it resolves to `gen_getContractSchema`.
+ */
+export async function getDeployedSchema(): Promise<ContractSchema> {
+  const address = getContractAddress();
+  if (!address) throw new Error("No contract address configured.");
+  const raw = await readClient().getContractSchema(address as `0x${string}`);
+  return fromGenLayer<ContractSchema>(raw);
+}
+
 export const checkEvidenceBinding = (evidenceId: string, contentDigest: string) =>
   read<BindingCheck>("check_evidence_binding", [evidenceId, contentDigest]);
 

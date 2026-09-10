@@ -131,6 +131,44 @@ test("window.ethereum is A but B is selected: B signs", async () => {
     "window.ethereum must not be consulted once a wallet is selected");
 });
 
+// ═══ §12 — the signing request itself, and its sender ═════════════════════
+
+test("the SIGNING request reaches the selected wallet, sent from its account", async () => {
+  // Account lookup is not signing. This sends the method a write actually
+  // ends in — eth_sendTransaction — and checks who was asked to sign it
+  // and on whose behalf.
+  const seen: Array<{ wallet: string; method: string; from?: string }> = [];
+  const recording = (name: string, address: string): Recorder => {
+    const base = fakeWallet(name, address);
+    return {
+      ...base,
+      async request(args: { method: string; params?: unknown }) {
+        const tx = Array.isArray(args.params) ? (args.params[0] as { from?: string }) : undefined;
+        seen.push({ wallet: name, method: args.method, from: tx?.from });
+        return base.request(args);
+      },
+    };
+  };
+
+  const metamask = recording("MetaMask", ADDR_A);
+  const rabby = recording("Rabby", ADDR_B);
+  injectAsWindowEthereum(metamask);
+
+  const client = writeClient(rabby.address, rabby as never);
+  const hash = await client.request({
+    method: "eth_sendTransaction",
+    params: [{ from: ADDR_B, to: "0x8d57088F8054c715DD0b0E9D396F61CA1826d1f9", data: "0x" }],
+  } as never);
+
+  const signing = seen.filter((s) => s.method === "eth_sendTransaction");
+  assert.equal(signing.length, 1, "exactly one signing request");
+  assert.equal(signing[0].wallet, "Rabby", "the selected wallet was asked to sign");
+  assert.equal(signing[0].from, ADDR_B, "and the transaction's sender is its account");
+  assert.ok(!seen.some((s) => s.wallet === "MetaMask"),
+    "the injected global saw nothing at all");
+  assert.match(String(hash), /^0x[0-9a-f]{64}$/, "the selected wallet returned the hash");
+});
+
 // ═══ The regression this replaced ════════════════════════════════════════
 
 test("omitting the provider is what fell back to window.ethereum", async () => {

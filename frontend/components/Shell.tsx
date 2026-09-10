@@ -10,7 +10,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { hasContract } from "@/lib/genlayer/client";
+import { getContractAddress, hasContract } from "@/lib/genlayer/client";
+import { useDeploymentCheck } from "@/lib/hooks/useAttestia";
+import { describe } from "@/lib/contracts/compat";
 import { cn } from "@/lib/utils";
 import { WalletButton } from "./Wallet";
 import { Banner } from "./ui";
@@ -24,6 +26,7 @@ const NAV = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const configured = hasContract();
+  const { data: compat } = useDeploymentCheck();
 
   return (
     <div className="min-h-screen">
@@ -32,6 +35,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
              className="border-b border-[#5d302b] bg-[#160e0d] px-4 py-2 text-center
                         font-mono text-[11px] text-[#e0a49b]">
           NEXT_PUBLIC_CONTRACT_ADDRESS is not set — this app has no contract to read.
+        </div>
+      )}
+      {compat && !compat.compatible && (
+        <div role="alert"
+             className="border-b border-[#5d302b] bg-[#160e0d] px-4 py-2 text-center
+                        font-mono text-[11px] leading-relaxed text-[#e0a49b]">
+          {getContractAddress()} is not the deployment this app was built for
+          — {describe(compat)}. Writes are disabled; reads may be incomplete.
         </div>
       )}
 

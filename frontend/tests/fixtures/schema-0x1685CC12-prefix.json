@@ -1,0 +1,312 @@
+{
+  "_source": {
+    "address": "0x1685CC12792e2cd275eadc7FbCfa63A8317152D3",
+    "captured": "2026-09-10",
+    "method": "gen_getContractSchema",
+    "rpc": "https://studio.genlayer.com/api"
+  },
+  "ctor": {
+    "kwparams": {},
+    "params": []
+  },
+  "methods": {
+    "adjudicate": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "advance_clock": {
+      "kwparams": {},
+      "params": [
+        [
+          "seconds",
+          "int"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "int"
+    },
+    "close_evidence": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "create_claim": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_text",
+          "string"
+        ],
+        [
+          "evidence_window_seconds",
+          "int"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "finalize_claim": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "get_adjudication": {
+      "kwparams": {},
+      "params": [
+        [
+          "adjudication_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_attestation": {
+      "kwparams": {},
+      "params": [
+        [
+          "attestation_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_challenge": {
+      "kwparams": {},
+      "params": [
+        [
+          "challenge_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_claim": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_claim_history": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_claim_verdict": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_evidence": {
+      "kwparams": {},
+      "params": [
+        [
+          "evidence_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "get_protocol_info": {
+      "kwparams": {},
+      "params": [],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "list_adjudications": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "array"
+    },
+    "list_challenges": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "array"
+    },
+    "list_claims": {
+      "kwparams": {},
+      "params": [
+        [
+          "offset",
+          "int"
+        ],
+        [
+          "limit",
+          "int"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    },
+    "list_evidence": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ],
+        [
+          "version",
+          "int"
+        ]
+      ],
+      "readonly": true,
+      "ret": "array"
+    },
+    "open_claim": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "null"
+    },
+    "remove_evidence": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ],
+        [
+          "evidence_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "null"
+    },
+    "start_adjudication": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "submit_challenge": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ],
+        [
+          "reason",
+          "string"
+        ],
+        [
+          "counter_evidence_json",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "submit_evidence": {
+      "kwparams": {},
+      "params": [
+        [
+          "claim_id",
+          "string"
+        ],
+        [
+          "source_url",
+          "string"
+        ],
+        [
+          "source_type",
+          "string"
+        ],
+        [
+          "description",
+          "string"
+        ],
+        [
+          "declared_relationship",
+          "string"
+        ]
+      ],
+      "payable": false,
+      "readonly": false,
+      "ret": "string"
+    },
+    "verify_attestation": {
+      "kwparams": {},
+      "params": [
+        [
+          "attestation_id",
+          "string"
+        ]
+      ],
+      "readonly": true,
+      "ret": "dict"
+    }
+  }
+}
